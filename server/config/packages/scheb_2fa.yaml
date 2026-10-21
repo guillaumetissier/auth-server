@@ -1,0 +1,17 @@
+scheb_two_factor:
+    security_tokens:
+        - Symfony\Component\Security\Core\Authentication\Token\UsernamePasswordToken
+
+    totp:
+        enabled: true
+        issuer: '%env(TOTP_ISSUER)%'
+        # Accept the previous/next 30 s window to absorb clock drift on phones.
+        leeway: 29
+        template: security/2fa_form.html.twig
+
+    backup_codes:
+        enabled: true
+
+    # A TOTP code can be used only once (prevents replay within its validity window).
+    code_reuse_cache: cache.app
+    code_reuse_cache_duration: 90

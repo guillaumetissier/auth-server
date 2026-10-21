@@ -1,0 +1,43 @@
+monolog:
+    channels: ['security_audit']
+
+when@dev:
+    monolog:
+        handlers:
+            main:
+                type: stream
+                path: 'php://stderr'
+                level: debug
+                channels: ['!event']
+
+when@test:
+    monolog:
+        handlers:
+            main:
+                type: stream
+                path: '%kernel.logs_dir%/%kernel.environment%.log'
+                level: warning
+
+when@prod:
+    monolog:
+        handlers:
+            main:
+                type: fingers_crossed
+                action_level: error
+                handler: nested
+                # Audit lines have their own handler below; keep them out of the error buffer (no duplicates).
+                channels: ['!security_audit']
+                excluded_http_codes: [404, 405]
+                buffer_size: 50
+            nested:
+                type: stream
+                path: 'php://stderr'
+                level: debug
+                formatter: monolog.formatter.json
+            # Security events (logins, failures, lockouts, 2FA changes) are always logged.
+            audit:
+                type: stream
+                path: 'php://stderr'
+                level: info
+                channels: ['security_audit']
+                formatter: monolog.formatter.json

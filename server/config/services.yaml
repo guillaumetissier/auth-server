@@ -1,0 +1,83 @@
+parameters:
+    app.issuer: '%env(APP_ISSUER)%'
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+        bind:
+            string $issuer: '%app.issuer%'
+            bool $dpopRequiredByDefault: '%env(bool:DPOP_REQUIRED_BY_DEFAULT)%'
+            string $publicKeyPath: '%env(resolve:OAUTH_PUBLIC_KEY)%'
+            string $privateKeyPath: '%env(resolve:OAUTH_PRIVATE_KEY)%'
+            Psr\Log\LoggerInterface $auditLogger: '@monolog.logger.security_audit'
+
+    App\:
+        resource: '../src/'
+        exclude:
+            - '../src/Kernel.php'
+            - '../src/Entity/'
+            - '../src/Event/'
+
+    # --- Two-factor ---------------------------------------------------------------------
+    App\TwoFactor\TotpSecretCipher:
+        arguments:
+            $base64Key: '%env(TOTP_ENCRYPTION_KEY)%'
+
+    # --- OAuth: identity of the user inside the tokens ("sub" = id in the main application) -
+    League\Bundle\OAuth2ServerBundle\Converter\UserConverterInterface: '@App\OAuth\ExternalIdUserConverter'
+
+    # --- DPoP ---------------------------------------------------------------------------
+    GuillaumeTissier\OAuthResourceGuard\Dpop\ReplayStoreInterface: '@App\Dpop\DoctrineReplayStore'
+
+    GuillaumeTissier\OAuthResourceGuard\Dpop\DpopProofValidator:
+        arguments:
+            $replayStore: '@GuillaumeTissier\OAuthResourceGuard\Dpop\ReplayStoreInterface'
+            $clock: '@clock'
+            $maxAgeSeconds: 300
+            $leewaySeconds: 30
+
+    # Access tokens are bound through their cnf.jkt claim (AccessTokenClaimsListener);
+    # refresh tokens through a stored binding checked on redemption.
+    App\Dpop\DpopBindingRefreshTokenRepository:
+        decorates: 'league.oauth2_server.repository.refresh_token'
+        arguments:
+            $inner: '@.inner'
+
+    # --- Impersonation ------------------------------------------------------------------
+    # Codes and tokens issued under an impersonation session carry it and die with it.
+    App\Impersonation\ImpersonationAuthCodeRepository:
+        decorates: 'league.oauth2_server.repository.auth_code'
+        arguments:
+            $inner: '@.inner'
+
+    App\Impersonation\ImpersonationAccessTokenRepository:
+        decorates: 'league.oauth2_server.repository.access_token'
+        arguments:
+            $inner: '@.inner'
+
+    App\Impersonation\ImpersonationRefreshTokenRepository:
+        decorates: 'league.oauth2_server.repository.refresh_token'
+        decoration_priority: -10
+        arguments:
+            $inner: '@.inner'
+
+    # --- Webhooks -----------------------------------------------------------------------
+    App\Webhook\WebhookNotifier:
+        arguments:
+            $urls: '%env(csv:WEBHOOK_URLS)%'
+            $secret: '%env(WEBHOOK_SECRET)%'
+
+when@test:
+    services:
+        _defaults:
+            autowire: true
+            autoconfigure: true
+
+        # Webhook deliveries are captured instead of sent.
+        App\Tests\Support\RecordingHttpClient: ~
+        App\Webhook\WebhookNotifier:
+            arguments:
+                $httpClient: '@App\Tests\Support\RecordingHttpClient'
+                $urls: '%env(csv:WEBHOOK_URLS)%'
+                $secret: '%env(WEBHOOK_SECRET)%'

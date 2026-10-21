@@ -1,0 +1,40 @@
+league_oauth2_server:
+    authorization_server:
+        private_key: '%env(resolve:OAUTH_PRIVATE_KEY)%'
+        private_key_passphrase: '%env(default::OAUTH_PASSPHRASE)%'
+        encryption_key: '%env(OAUTH_ENCRYPTION_KEY)%'
+        encryption_key_type: 'plain'
+        access_token_ttl: '%env(OAUTH_ACCESS_TOKEN_TTL)%'
+        refresh_token_ttl: '%env(OAUTH_REFRESH_TOKEN_TTL)%'
+        auth_code_ttl: PT5M
+
+        # OAuth 2.1 profile: Authorization Code + PKCE and refresh tokens only.
+        enable_auth_code_grant: true
+        enable_refresh_token_grant: true
+        enable_client_credentials_grant: false
+        enable_password_grant: false
+        enable_implicit_grant: false
+        enable_device_code_grant: false
+        # PKCE is enforced for every client (public and confidential) by App\OAuth\AuthorizationRequestListener.
+        require_code_challenge_for_public_clients: true
+        # Refresh token rotation.
+        revoke_refresh_tokens: true
+        persist_access_token: true
+
+    resource_server:
+        public_key: '%env(resolve:OAUTH_PUBLIC_KEY)%'
+
+    scopes:
+        # Scopes your resource servers understand. Extend as needed.
+        available: ['profile', 'offline_access']
+        default: ['profile']
+
+    persistence:
+        doctrine:
+            entity_manager: default
+            table_prefix: oauth2_
+
+when@test:
+    league_oauth2_server:
+        scopes:
+            available: ['profile', 'offline_access', 'items.read', 'items.write']

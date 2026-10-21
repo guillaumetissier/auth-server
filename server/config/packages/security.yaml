@@ -1,0 +1,74 @@
+security:
+    password_hashers:
+        # Argon2id (hashes embed their own salt). bcrypt hashes imported from the main application
+        # ("$2y$…", Laravel) are still verified, and rehashed to Argon2id at the first successful login.
+        App\Entity\User:
+            algorithm: argon2id
+
+    # ROLE_SUPER_ADMIN (one employee) > ROLE_ADMIN (read-only impersonation) > ROLE_USER
+    role_hierarchy:
+        ROLE_SUPER_ADMIN: [ROLE_ADMIN]
+
+    providers:
+        app_user_provider:
+            entity:
+                class: App\Entity\User
+                property: username
+
+    firewalls:
+        dev:
+            pattern: ^/(_profiler|_wdt|assets)/
+            security: false
+
+        # Token endpoint: clients authenticate with their own credentials (or none for public clients + PKCE).
+        oauth_token:
+            pattern: ^/token$
+            stateless: true
+            security: false
+
+        public_endpoints:
+            pattern: ^/(\.well-known/|health$|impersonation/end$)
+            stateless: true
+            security: false
+
+        main:
+            lazy: true
+            provider: app_user_provider
+            user_checker: App\Security\UserChecker
+            form_login:
+                login_path: app_login
+                check_path: app_login
+                enable_csrf: true
+                default_target_path: app_account
+                username_parameter: _username
+                password_parameter: _password
+            login_throttling:
+                # Per username+IP: 5 attempts per 15 minutes; global per-IP limiter on top.
+                max_attempts: 5
+                interval: '15 minutes'
+            two_factor:
+                auth_form_path: 2fa_login
+                check_path: 2fa_login_check
+                enable_csrf: true
+                prepare_on_login: true
+                prepare_on_access_denied: true
+            logout:
+                path: app_logout
+                target: app_login
+
+    access_control:
+        - { path: ^/login$, roles: PUBLIC_ACCESS }
+        - { path: ^/logout$, roles: PUBLIC_ACCESS }
+        - { path: ^/2fa, roles: IS_AUTHENTICATED_2FA_IN_PROGRESS }
+        - { path: ^/authorize, roles: IS_AUTHENTICATED_FULLY }
+        - { path: ^/account, roles: IS_AUTHENTICATED_FULLY }
+        - { path: ^/impersonation/confirm, roles: ROLE_ADMIN }
+
+when@test:
+    security:
+        password_hashers:
+            # Fast hashing in tests only.
+            App\Entity\User:
+                algorithm: argon2id
+                time_cost: 3
+                memory_cost: 1024

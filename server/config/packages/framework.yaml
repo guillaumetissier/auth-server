@@ -1,0 +1,36 @@
+framework:
+    secret: '%env(APP_SECRET)%'
+    http_method_override: false
+    handle_all_throwables: true
+    trust_x_sendfile_type_header: false
+
+    session:
+        # Only the login / 2FA / authorize steps use the session; tokens are stateless.
+        handler_id: null
+        cookie_secure: auto
+        cookie_samesite: lax
+        cookie_httponly: true
+        name: AUTHSESSID
+
+    php_errors:
+        log: true
+
+    rate_limiter:
+        # Used by the login throttling of the "main" firewall (see security.yaml).
+        login_global:
+            policy: sliding_window
+            limit: 50
+            interval: '15 minutes'
+
+    http_client:
+        default_options:
+            timeout: 5
+            max_redirects: 0
+
+    lock: 'flock'
+
+when@test:
+    framework:
+        test: true
+        session:
+            storage_factory_id: session.storage.factory.mock_file

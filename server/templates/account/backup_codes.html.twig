@@ -1,0 +1,19 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Backup codes{% endblock %}
+
+{% block body %}
+    <h1>Save your backup codes</h1>
+    <p class="sub">
+        Each code works once, if you lose access to your authenticator app.
+        Store them somewhere safe: they will not be shown again.
+    </p>
+
+    <ol class="codes">
+        {% for code in codes %}
+            <li>{{ code }}</li>
+        {% endfor %}
+    </ol>
+
+    <a class="button" href="{{ continue_to }}">I have saved them, continue</a>
+{% endblock %}

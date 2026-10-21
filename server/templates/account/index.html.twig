@@ -1,0 +1,38 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Account{% endblock %}
+
+{% block body %}
+    <h1>{{ user.username }}</h1>
+    <p class="sub">You are signed in.</p>
+
+    <dl>
+        <dt>Two-factor</dt>
+        <dd>{{ user.totpAuthenticationEnabled ? 'Enabled since ' ~ user.totpEnabledAt|date('Y-m-d') : 'Not enabled' }}</dd>
+        {% if user.totpAuthenticationEnabled %}
+            <dt>Backup codes</dt>
+            <dd>{{ user.countBackupCodes }} left</dd>
+        {% endif %}
+    </dl>
+
+    {% if not user.totpAuthenticationEnabled %}
+        <a class="button" href="{{ path('app_2fa_setup') }}">Set up two-factor authentication</a>
+    {% else %}
+        <form method="post" action="{{ path('app_2fa_backup_codes_regenerate') }}">
+            <label for="code-regen">Current code (to confirm)</label>
+            <input type="text" id="code-regen" name="code" class="code" inputmode="numeric" maxlength="6" required autocomplete="one-time-code">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('totp_manage') }}">
+            <button type="submit" class="secondary">Generate new backup codes</button>
+        </form>
+        {% if can_disable %}
+            <form method="post" action="{{ path('app_2fa_disable') }}">
+                <label for="code-disable">Current code (to confirm)</label>
+                <input type="text" id="code-disable" name="code" class="code" inputmode="numeric" maxlength="6" required autocomplete="one-time-code">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('totp_manage') }}">
+                <button type="submit" class="secondary">Disable two-factor authentication</button>
+            </form>
+        {% endif %}
+    {% endif %}
+
+    <p class="links"><a href="{{ path('app_logout') }}">Sign out</a></p>
+{% endblock %}

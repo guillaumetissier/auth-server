@@ -1,0 +1,19 @@
+{
+	frankenphp
+	# TLS is terminated by the reverse proxy / load balancer in front of the container.
+	auto_https off
+	admin off
+}
+
+{$SERVER_NAME::8080} {
+	root * /app/public
+	encode zstd br gzip
+
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	}
+
+	php_server
+}

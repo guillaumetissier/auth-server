@@ -1,0 +1,25 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Sign in{% endblock %}
+
+{% block body %}
+    <h1>Sign in</h1>
+    <p class="sub">{{ app_name }}</p>
+
+    {% if error %}
+        {# Same message for unknown user and wrong password: no account enumeration. #}
+        <div class="alert error" role="alert">{{ error.messageKey|replace(error.messageData) }}</div>
+    {% endif %}
+
+    <form method="post" action="{{ path('app_login') }}">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="_username" value="{{ last_username }}" autocomplete="username" required autofocus>
+
+        <label for="password">Password</label>
+        <input type="password" id="password" name="_password" autocomplete="current-password" required>
+
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
+
+        <button type="submit">Continue</button>
+    </form>
+{% endblock %}

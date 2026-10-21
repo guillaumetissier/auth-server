@@ -1,0 +1,33 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Act on behalf of {{ target.username }}{% endblock %}
+
+{% block body %}
+    <h1>Act on behalf of {{ target.username }}</h1>
+    <p class="sub">
+        {% if mode == 'full' %}
+            You will have <strong>all the rights</strong> of this user
+        {% else %}
+            You will have <strong>read-only</strong> access as this user
+        {% endif %}
+        for at most {{ ttl_minutes }} minutes. Everything you do is recorded under your name.
+    </p>
+
+    {% for error in errors %}
+        <div class="alert error" role="alert">{{ error }}</div>
+    {% endfor %}
+
+    <form method="post">
+        <label for="reason">Reason (ticket, request…)</label>
+        <input type="text" id="reason" name="reason" value="{{ reason }}" minlength="10" maxlength="500" required autofocus>
+
+        <label for="code">Your authentication code</label>
+        <input type="text" id="code" name="code" class="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+               autocomplete="one-time-code" required>
+
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('impersonation_confirm') }}">
+        <button type="submit">Start</button>
+    </form>
+
+    <p class="links"><a href="{{ path('app_account') }}">Cancel</a></p>
+{% endblock %}

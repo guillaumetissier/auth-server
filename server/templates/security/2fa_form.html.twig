@@ -1,0 +1,30 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Two-factor authentication{% endblock %}
+
+{% block body %}
+    <h1>Two-factor authentication</h1>
+    <p class="sub">Enter the 6-digit code from your authenticator app, or one of your backup codes.</p>
+
+    {% if authenticationError %}
+        <div class="alert error" role="alert">
+            {% if authenticationError == 'code_invalid' %}This code is not valid.
+            {% elseif authenticationError == 'code_reused' %}This code has already been used, wait for the next one.
+            {% else %}Authentication failed, please try again.{% endif %}
+        </div>
+    {% endif %}
+
+    <form method="post" action="{{ checkPathUrl ? checkPathUrl : path(checkPathRoute) }}">
+        <label for="_auth_code">Authentication code</label>
+        <input type="text" id="_auth_code" name="{{ authCodeParameterName }}" class="code"
+               autocomplete="one-time-code" autofocus required maxlength="11">
+
+        {% if isCsrfProtectionEnabled %}
+            <input type="hidden" name="{{ csrfParameterName }}" value="{{ csrf_token(csrfTokenId) }}">
+        {% endif %}
+
+        <button type="submit">Verify</button>
+    </form>
+
+    <p class="links"><a href="{{ logoutPath }}">Cancel and sign out</a></p>
+{% endblock %}

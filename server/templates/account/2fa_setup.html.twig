@@ -1,0 +1,42 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Set up two-factor authentication{% endblock %}
+
+{% block body %}
+    <h1>Set up two-factor authentication</h1>
+    <p class="sub">
+        {% if can_postpone and deadline %}
+            Two-factor authentication will be required from {{ deadline|date('d/m/Y') }}
+            ({{ days_left }} day{{ days_left == 1 ? '' : 's' }} left). You can set it up now or later.
+        {% elseif can_postpone %}
+            Two-factor authentication will soon be required. You can set it up now or later.
+        {% else %}
+            Two-factor authentication is required for your account.
+        {% endif %}
+        Scan this code with Google Authenticator, Microsoft Authenticator, 2FAS or any TOTP app.
+    </p>
+
+    <img class="qr" src="{{ qr_code }}" alt="QR code to scan with your authenticator app">
+    <p class="secret">Or enter this key manually:<br><strong>{{ secret }}</strong></p>
+
+    {% if error %}
+        <div class="alert error" role="alert">{{ error }}</div>
+    {% endif %}
+
+    <form method="post">
+        <label for="code">Code shown by the app</label>
+        <input type="text" id="code" name="code" class="code" inputmode="numeric" pattern="[0-9]{6}"
+               maxlength="6" autocomplete="one-time-code" required autofocus>
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('totp_setup') }}">
+        <button type="submit">Activate</button>
+    </form>
+
+    {% if can_postpone %}
+        <form method="post" action="{{ path('app_2fa_postpone', return_to ? {return_to: return_to} : {}) }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('totp_postpone') }}">
+            <button type="submit" class="secondary">Later</button>
+        </form>
+    {% endif %}
+
+    <p class="links"><a href="{{ path('app_logout') }}">Sign out</a></p>
+{% endblock %}
