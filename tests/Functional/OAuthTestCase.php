@@ -7,9 +7,9 @@ namespace App\Tests\Functional;
 use App\Entity\User;
 use App\Tests\Support\RecordingHttpClient;
 use App\TwoFactor\TotpEnrollment;
-use GuillaumeTissier\ResourceGuard\Client\DpopProofFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
+use GuillaumeTissier\ResourceGuard\Client\DpopProofFactory;
 use League\Bundle\OAuth2ServerBundle\Manager\ClientManagerInterface;
 use League\Bundle\OAuth2ServerBundle\Model\Client;
 use League\Bundle\OAuth2ServerBundle\ValueObject\Grant;
@@ -22,15 +22,17 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 abstract class OAuthTestCase extends WebTestCase
 {
-    protected const CLIENT_ID = 'spa';
-    protected const REDIRECT_URI = 'http://spa.test/callback';
-    protected const TOKEN_URL = 'http://localhost/token';
-    protected const PASSWORD = 'correct horse battery staple';
+    protected const string CLIENT_ID = 'spa';
+    protected const string REDIRECT_URI = 'http://spa.test/callback';
+    protected const string TOKEN_URL = 'http://localhost/token';
+    protected const string PASSWORD  = 'correct horse battery staple';
 
     protected KernelBrowser $browser;
 
     protected function setUp(): void
     {
+        // A test that failed in the middle of a request can leave the kernel booted.
+        self::ensureKernelShutdown();
         $this->browser = static::createClient();
         RecordingHttpClient::$requests = [];
 
@@ -92,14 +94,14 @@ abstract class OAuthTestCase extends WebTestCase
     protected static function authorizeUrl(string $challenge, array $overrides = []): string
     {
         return '/authorize?'.http_build_query($overrides + [
-            'response_type' => 'code',
-            'client_id' => self::CLIENT_ID,
-            'redirect_uri' => self::REDIRECT_URI,
-            'scope' => 'profile offline_access',
-            'state' => 'xyz',
-            'code_challenge' => $challenge,
-            'code_challenge_method' => 'S256',
-        ]);
+                    'response_type' => 'code',
+                    'client_id' => self::CLIENT_ID,
+                    'redirect_uri' => self::REDIRECT_URI,
+                    'scope' => 'profile offline_access',
+                    'state' => 'xyz',
+                    'code_challenge' => $challenge,
+                    'code_challenge_method' => 'S256',
+                ]);
     }
 
     protected function submitLogin(string $username = 'alice', string $password = self::PASSWORD, string $ip = '10.0.0.1'): void

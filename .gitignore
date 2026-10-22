@@ -1,7 +1,8 @@
 # --- Secrets and local configuration ---
-/.env
-/server/.env.local
-/server/.env.*.local
+# Docker Compose variables and secrets (make secrets); .env (Symfony defaults) is committed
+/.env.docker
+/.env.local
+/.env.*.local
 /docker-compose.override.yml
 # RSA signing keys and any other key material
 *.pem
@@ -10,15 +11,15 @@
 /users*.csv
 
 # --- PHP / Symfony ---
-/server/vendor/
-/server/var/
-/server/public/bundles/
-/server/.phpunit.result.cache
+/vendor/
+/var/
+/public/bundles/
 .phpunit.cache/
 .phpunit.result.cache
 .php-cs-fixer.cache
 composer.local.json
 composer.local.lock
+composer.lock
 
 # --- Node / TypeScript ---
 node_modules/

@@ -4,6 +4,12 @@ set -eu
 
 cd /app
 
+# With Docker Compose, the database credentials come as MYSQL_* (shared with the MySQL container).
+if [ -z "${DATABASE_URL:-}" ] && [ -n "${MYSQL_PASSWORD:-}" ]; then
+    DATABASE_URL="mysql://${MYSQL_USER:-auth}:${MYSQL_PASSWORD}@${MYSQL_HOST:-auth-db}:3306/${MYSQL_DATABASE:-auth}?serverVersion=8.4.0&charset=utf8mb4"
+    export DATABASE_URL
+fi
+
 for var in APP_SECRET OAUTH_ENCRYPTION_KEY TOTP_ENCRYPTION_KEY DATABASE_URL APP_ISSUER; do
     eval "value=\${$var:-}"
     if [ -z "$value" ]; then

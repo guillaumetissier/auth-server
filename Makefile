@@ -6,14 +6,14 @@ CONSOLE  = $(COMPOSE) exec auth-server php bin/console
 help: ## List the targets
 	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-14s %s\n", $$1, $$2}'
 
-secrets: ## Fill the empty secrets of .env with random values
-	@test -f .env || cp .env.example .env
+secrets: ## Create .env.docker from .env.docker.example and fill its empty secrets with random values
+	@test -f .env.docker || cp .env.docker.example .env.docker
 	@for v in APP_SECRET MYSQL_PASSWORD MYSQL_ROOT_PASSWORD OAUTH_ENCRYPTION_KEY WEBHOOK_SECRET; do \
-		grep -q "^$$v=$$" .env && sed -i.bak "s|^$$v=$$|$$v=$$(openssl rand -hex 32)|" .env || true; \
+		grep -q "^$$v=$$" .env.docker && sed -i.bak "s|^$$v=$$|$$v=$$(openssl rand -hex 32)|" .env.docker || true; \
 	done
-	@grep -q '^TOTP_ENCRYPTION_KEY=$$' .env && sed -i.bak "s|^TOTP_ENCRYPTION_KEY=$$|TOTP_ENCRYPTION_KEY=$$(openssl rand -base64 32)|" .env || true
-	@rm -f .env.bak
-	@echo "Secrets written to .env (keep this file out of version control)."
+	@grep -q '^TOTP_ENCRYPTION_KEY=$$' .env.docker && sed -i.bak "s|^TOTP_ENCRYPTION_KEY=$$|TOTP_ENCRYPTION_KEY=$$(openssl rand -base64 32)|" .env.docker || true
+	@rm -f .env.docker.bak
+	@echo "Secrets written to .env.docker (ignored by git)."
 
 up: ## Build and start the stack
 	$(COMPOSE) up -d --build
@@ -68,4 +68,4 @@ purge: ## Remove expired tokens and DPoP replay entries (schedule it, e.g. hourl
 	$(CONSOLE) app:purge
 
 test: ## Run the server test suite locally (needs PHP 8.3+ and composer)
-	cd server && composer install -q && vendor/bin/phpunit
+	composer install -q && vendor/bin/phpunit

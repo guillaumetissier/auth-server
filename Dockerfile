@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 #
-# Auth server image. Build context = repository root:
-#   docker build -f server/Dockerfile -t auth-server .
+# Auth server image:
+#   docker build -t auth-server .
 
 ARG PHP_VERSION=8.4
 
@@ -12,8 +12,8 @@ RUN install-php-extensions pdo_mysql intl opcache apcu zip \
  && apt-get update && apt-get install -y --no-install-recommends curl \
  && rm -rf /var/lib/apt/lists/*
 
-COPY server/docker/php.ini $PHP_INI_DIR/conf.d/zz-auth-server.ini
-COPY server/docker/Caddyfile /etc/frankenphp/Caddyfile
+COPY docker/php.ini $PHP_INI_DIR/conf.d/zz-auth-server.ini
+COPY docker/Caddyfile /etc/frankenphp/Caddyfile
 
 WORKDIR /app
 
@@ -23,10 +23,10 @@ FROM base AS vendor
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 ENV COMPOSER_ALLOW_SUPERUSER=1
 
-COPY server/composer.json server/composer.lock* ./
+COPY composer.json composer.lock* ./
 RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-progress --no-interaction
 
-COPY server/ ./
+COPY . ./
 RUN composer dump-autoload --no-dev --classmap-authoritative \
  && rm -rf tests phpunit.xml.dist .env.test var
 
@@ -38,7 +38,7 @@ ENV APP_ENV=prod \
     SERVER_NAME=:8080
 
 COPY --from=vendor /app /app
-COPY server/docker/entrypoint.sh /usr/local/bin/entrypoint
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint
 
 # Unprivileged runtime user; Caddy only needs to write its data/config dirs.
 RUN useradd --system --uid 10001 --home-dir /app app \

@@ -1,7 +1,9 @@
 # Auth server stack: the PHP application and its own MySQL database, isolated from any other project.
 #
-#   cp .env.example .env && make secrets   # once
-#   docker compose up -d --build
+#   make secrets   # once: creates .env.docker with random secrets
+#   make up        # = docker compose up -d --build
+#
+# Published port: 8080, or AUTH_SERVER_PORT from the shell (AUTH_SERVER_PORT=8081 make up).
 #
 # Attaching an application: join the "auth-server" network from its own compose file
 # (see README) and call http://auth-server:8080 internally; browsers use APP_ISSUER.
@@ -10,30 +12,12 @@ services:
   auth-server:
     build:
       context: .
-      dockerfile: server/Dockerfile
+      dockerfile: Dockerfile
     image: auth-server:latest
     restart: unless-stopped
-    environment:
-      APP_SECRET: ${APP_SECRET:?run "make secrets" first}
-      APP_ISSUER: ${APP_ISSUER:-http://localhost:8080}
-      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
-      DATABASE_URL: mysql://${MYSQL_USER:-auth}:${MYSQL_PASSWORD:?}@auth-db:3306/${MYSQL_DATABASE:-auth}?serverVersion=8.4.0&charset=utf8mb4
-      OAUTH_ENCRYPTION_KEY: ${OAUTH_ENCRYPTION_KEY:?}
-      OAUTH_PASSPHRASE: ${OAUTH_PASSPHRASE:-}
-      OAUTH_ACCESS_TOKEN_TTL: ${OAUTH_ACCESS_TOKEN_TTL:-PT15M}
-      OAUTH_REFRESH_TOKEN_TTL: ${OAUTH_REFRESH_TOKEN_TTL:-P30D}
-      TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:?}
-      TOTP_ISSUER: ${TOTP_ISSUER:-Auth Server}
-      APP_2FA_MODE: ${APP_2FA_MODE:-grace}
-      APP_2FA_DEADLINE: ${APP_2FA_DEADLINE:-}
-      DPOP_REQUIRED_BY_DEFAULT: ${DPOP_REQUIRED_BY_DEFAULT:-1}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
-      IMPERSONATION_TTL: ${IMPERSONATION_TTL:-PT30M}
-      IMPERSONATION_ACCESS_TOKEN_TTL: ${IMPERSONATION_ACCESS_TOKEN_TTL:-PT5M}
-      IMPERSONATION_READONLY_SCOPES: ${IMPERSONATION_READONLY_SCOPES:-profile,offline_access}
-      ACCESS_DEFAULT_EXPRESSION: ${ACCESS_DEFAULT_EXPRESSION:-}
-      WEBHOOK_URLS: ${WEBHOOK_URLS:-}
-      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-}
+    # Settings and secrets: .env.docker ("make secrets" creates it) overrides the defaults of .env.
+    # No ${...} for settings here: Compose would take them from .env, the Symfony defaults.
+    env_file: .env.docker
     ports:
       - "${AUTH_SERVER_PORT:-8080}:8080"
     volumes:
@@ -52,11 +36,7 @@ services:
     image: mysql:8.4
     restart: unless-stopped
     command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
-    environment:
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-auth}
-      MYSQL_USER: ${MYSQL_USER:-auth}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?}
+    env_file: .env.docker   # MYSQL_DATABASE, MYSQL_USER, MYSQL_PASSWORD, MYSQL_ROOT_PASSWORD
     volumes:
       - auth-db-data:/var/lib/mysql
     healthcheck:
