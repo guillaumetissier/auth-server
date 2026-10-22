@@ -62,7 +62,8 @@ security:
         - { path: ^/2fa, roles: IS_AUTHENTICATED_2FA_IN_PROGRESS }
         - { path: ^/authorize, roles: IS_AUTHENTICATED_FULLY }
         - { path: ^/account, roles: IS_AUTHENTICATED_FULLY }
-        - { path: ^/impersonation/confirm, roles: ROLE_ADMIN }
+        - { path: ^/impersonation/confirm, roles: IS_AUTHENTICATED_FULLY }   # ImpersonationPolicy decides
+        - { path: ^/admin, roles: IS_AUTHENTICATED_FULLY }                   # AccessPolicy decides
 
 when@test:
     security:

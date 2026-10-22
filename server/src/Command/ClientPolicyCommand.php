@@ -13,7 +13,7 @@ use Symfony\Component\Console\Attribute\Option;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
-#[AsCommand(name: 'app:client:policy', description: 'Sets whether an OAuth client must use DPoP-bound tokens')]
+#[AsCommand(name: 'app:client:policy', description: 'Per-client settings: DPoP requirement, impersonation entry point')]
 final readonly class ClientPolicyCommand
 {
     public function __construct(private EntityManagerInterface $em)
@@ -25,9 +25,11 @@ final readonly class ClientPolicyCommand
         #[Argument('Client identifier')] string $client,
         #[Option('Require DPoP proofs at the token endpoint')] bool $requireDpop = false,
         #[Option('Allow Bearer tokens (no DPoP) for this client')] bool $allowBearer = false,
+        #[Option('Follow DPOP_REQUIRED_BY_DEFAULT')] bool $defaultDpop = false,
+        #[Option('URL where the application starts an impersonation, with {user}; "none" to remove')] ?string $impersonationUri = null,
     ): int {
-        if ($requireDpop === $allowBearer) {
-            $io->error('Pass exactly one of --require-dpop or --allow-bearer.');
+        if ((int) $requireDpop + (int) $allowBearer + (int) $defaultDpop > 1) {
+            $io->error('Pass at most one of --require-dpop, --allow-bearer and --default-dpop.');
 
             return Command::INVALID;
         }
@@ -41,13 +43,29 @@ final readonly class ClientPolicyCommand
 
         $policy = $this->em->getRepository(ClientPolicy::class)->findOneBy(['client' => $client]);
         if (null === $policy) {
-            $this->em->persist(new ClientPolicy($clientEntity, $requireDpop));
-        } else {
-            $policy->setRequireDpop($requireDpop);
+            $policy = new ClientPolicy($clientEntity);
+            $this->em->persist($policy);
+        }
+        if ($requireDpop || $allowBearer || $defaultDpop) {
+            $policy->setRequireDpop($defaultDpop ? null : $requireDpop);
+        }
+        if (null !== $impersonationUri) {
+            try {
+                $policy->setImpersonationStartUri('none' === $impersonationUri ? null : $impersonationUri);
+            } catch (\InvalidArgumentException $e) {
+                $io->error($e->getMessage());
+
+                return Command::INVALID;
+            }
         }
         $this->em->flush();
 
-        $io->success(\sprintf('Client "%s": DPoP %s.', $client, $requireDpop ? 'required' : 'optional'));
+        $io->success(\sprintf(
+            'Client "%s": DPoP %s, impersonation entry point: %s.',
+            $client,
+            match ($policy->requiresDpop()) { true => 'required', false => 'optional', null => 'as DPOP_REQUIRED_BY_DEFAULT' },
+            $policy->getImpersonationStartUri() ?? 'none',
+        ));
 
         return Command::SUCCESS;
     }

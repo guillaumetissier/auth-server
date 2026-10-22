@@ -34,5 +34,9 @@
         {% endif %}
     {% endif %}
 
+    {% if can_administer %}
+        <a class="button" href="{{ path('app_admin_domains') }}">Users and rights</a>
+    {% endif %}
+
     <p class="links"><a href="{{ path('app_logout') }}">Sign out</a></p>
 {% endblock %}

@@ -15,4 +15,9 @@ First public version.
 - TOTP two-factor authentication with backup codes; roll-out modes `optional`, `grace` (with deadline) and `required`.
 - Administrator impersonation (read-only `ROLE_ADMIN`, single full-access `ROLE_SUPER_ADMIN`), RFC 8693 `act` claim, audited sessions.
 - Login lockout, audit log, signed webhooks, import of existing bcrypt/argon2 password hashes.
+- Domains (tree) and access rights as compact expressions (`*:w tire:r user:w:own`): per-domain owners,
+  `ACCESS_DEFAULT_EXPRESSION`, reserved powers `@access`, `@domain`, `@impersonate`; `dom`/`acl` token claims;
+  `user.access_changed` webhook; JSON import with dry run.
+- Administration pages: domains, users, rights with delegation bounds and preview, platform roles, resource
+  types, Impersonate button through a per-client entry point. Impersonation by domain users holding `@impersonate`.
 - `oauth-dpop-client`: browser helper for PKCE, DPoP proofs, token refresh and impersonation.

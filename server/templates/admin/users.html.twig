@@ -1,0 +1,30 @@
+{% extends 'admin/_layout.html.twig' %}
+
+{% block title %}Users{% endblock %}
+
+{% block content %}
+    <h1>Users</h1>
+    <form method="get">
+        <div class="row">
+            <div class="grow"><label for="q">Username or user id</label><input type="text" id="q" name="q" value="{{ query }}" autofocus></div>
+            <div><button type="submit" class="secondary">Search</button></div>
+        </div>
+    </form>
+
+    <table style="margin-top: 16px">
+        <thead><tr><th>Username</th><th>User id</th><th>Domain</th><th>Role</th></tr></thead>
+        <tbody>
+        {% for u in users %}
+            <tr>
+                <td><a href="{{ path('app_admin_user', {id: u.id}) }}">{{ u.username }}</a></td>
+                <td class="expr">{{ u.externalUserId }}</td>
+                <td class="expr">{{ u.domain ? u.domain.path : '—' }}</td>
+                <td>{% if 'ROLE_SUPER_ADMIN' in u.roles %}super-admin{% elseif 'ROLE_ADMIN' in u.roles %}admin{% endif %}</td>
+            </tr>
+        {% else %}
+            <tr><td colspan="4" class="muted">No user found.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% if users|length == 100 %}<p class="help">First 100 results: refine the search.</p>{% endif %}
+{% endblock %}

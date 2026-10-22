@@ -107,8 +107,9 @@ The dev keys above are for local use only: production values come from `make sec
 make test        # needs PHP 8.3+ and Composer
 ```
 
-The server has 30 functional tests on SQLite covering the complete flow (login, TOTP,
-PKCE, DPoP-bound tokens, key-bound refresh), 2FA roll-out, import, lockout, CORS and impersonation.
+The server has 40 functional tests on SQLite covering the complete flow (login, TOTP,
+PKCE, DPoP-bound tokens, key-bound refresh), 2FA roll-out, import, lockout, CORS, impersonation, domains,
+rights, delegation bounds and the administration pages.
 
 ## Configuration
 
@@ -127,6 +128,7 @@ All settings are environment variables (`.env` for Docker Compose).
 | `IMPERSONATION_TTL` | `PT30M` | Maximum length of an impersonation session |
 | `IMPERSONATION_ACCESS_TOKEN_TTL` | `PT5M` | Access token lifetime during an impersonation |
 | `IMPERSONATION_READONLY_SCOPES` | `profile,offline_access` | Scopes kept in read-only impersonations |
+| `ACCESS_DEFAULT_EXPRESSION` | empty | Rights every user holds on his own domain, e.g. `user:w:own` (see [Domains and rights](#domains-and-rights)) |
 | `WEBHOOK_URLS` / `WEBHOOK_SECRET` | empty | Endpoints receiving signed account events, and the shared HMAC secret (32+ characters) |
 | `APP_SECRET`, `MYSQL_*`, `OAUTH_ENCRYPTION_KEY`, `TOTP_ENCRYPTION_KEY` | generated | Secrets, filled by `make secrets` |
 
@@ -220,8 +222,14 @@ Support staff can act on behalf of a user, with a reason, a fresh TOTP code and 
 |---|---|---|---|
 | `ROLE_ADMIN` | any number | **Read-only**: scopes reduced to `IMPERSONATION_READONLY_SCOPES`, and resource-guard refuses every non-GET request (403 `impersonation_read_only`) | Regular users |
 | `ROLE_SUPER_ADMIN` | **one** account (enforced by `make role`; `FLAG=--transfer` moves it) | **Full rights** of the user | Regular users and admins |
+| Domain users with `@impersonate` | as granted | `@impersonate:r` read-only, `@impersonate:w` full | Users of the domains where they hold it, never platform staff nor the owner of their own domain or of a domain above |
 
-Nobody impersonates the super-administrator or themselves.
+Nobody impersonates the super-administrator or themselves. Domain owners do not impersonate by default:
+add `@impersonate:r` (or `:w`) to the owner rights of their domain.
+
+The administration pages show an **Impersonate** button on each user the viewer may impersonate. It
+opens the client application's entry point (`make client-policy ID=my-spa FLAG='--impersonation-uri=https://app.example.com/impersonate?user={user}'`),
+which starts the flow below: only the application holds its PKCE verifier and DPoP key.
 
 1. The browser client starts a normal authorization with `impersonate=<external user id>`:
    `buildAuthorizeUrl(config, { impersonate: '43' })`.
@@ -233,6 +241,78 @@ Nobody impersonates the super-administrator or themselves.
 Audit with `make impersonations` and the `impersonation.started` / `impersonation.ended` webhooks.
 Resource servers should record `$principal->actorId()` in their own audit trail.
 
+## Domains and rights
+
+Optional: without domains, everything above works unchanged.
+
+**Domains** form a tree (`a1 > a10 > a100`). A user belongs to at most one domain and never gets any
+access above it or beside it: a user of `a10` may reach `a100` and `a101` if granted, never `a1` or the
+sibling `a11`. Platform staff (`ROLE_ADMIN`) usually belong to no domain.
+
+**Rights** are access expressions, held on a domain and optionally all its subdomains:
+
+```
+*:w  tire:r  invoice:-  user:r  user:w:own  @access:w
+```
+
+| Element | Meaning |
+|---|---|
+| `-` `r` `w` `m` | none, read, write, manage (`AccessLevel` enum); each level includes the lower ones |
+| `*` | every resource type; a named type beats `*`, whatever the order (`*:w tire:r` caps tires at read) |
+| `:own` | only resources owned by the user (`user:r user:w:own`: reads every profile, edits his own) |
+| `@access` `@domain` `@impersonate` | reserved system powers, never covered by `*`: manage users' rights, manage subdomains, impersonate |
+
+Resource types are declared once (`make resource-type`, or the administration pages): an expression
+naming an unknown type is refused.
+
+A user's effective rights are, by domain, the highest level among: his grants, the **owner rights** of
+the domains he owns (default `*:m @access:w @domain:w`, set per domain), and `ACCESS_DEFAULT_EXPRESSION`
+on his own domain. They travel in the access token, and resource servers check them offline:
+
+```json
+"dom": "/a1/a10/",
+"acl": [["/a1/a10/", true, "*:r vehicle:w"], ["/a1/a10/", true, "user:w:own"]]
+```
+
+```php
+$principal->can('vehicle', AccessLevel::Write, $vehicle->domainPath);              // GuillaumeTissier\ResourceGuard\Access\AccessLevel
+$principal->can('user', AccessLevel::Write, $profile->domainPath, ownerId: $profile->userId);
+```
+
+Changes take effect in the user's next access token (at most `OAUTH_ACCESS_TOKEN_TTL`) and are announced
+by the `user.access_changed` webhook.
+
+**Administration** (`/admin`, linked from the account page):
+
+| Who | Sees | Changes |
+|---|---|---|
+| `ROLE_SUPER_ADMIN` | everything | everything, including who is platform administrator |
+| `ROLE_ADMIN` | everything | nothing |
+| Holder of `@access:r` / `@access:w` on a domain | its users and their rights | their rights and membership, **never beyond his own rights**, never his own rights nor those of the owner of his domain |
+| Holder of `@domain:w` on a domain | its subdomains | creates subdomains, sets their owner and owner rights (within his own rights) |
+
+Each user page has a preview of the effective level per resource type, as resource servers will compute it.
+
+**Import** from another system once, then manage here:
+
+```bash
+make access-import FILE=access.json FLAG=--dry-run    # checks everything, writes nothing
+make access-import FILE=access.json
+```
+
+```json
+{
+  "resource_types": [{"code": "vehicle", "label": "Vehicles"}],
+  "domains":  [{"code": "a1", "name": "Group", "parent": null},
+               {"code": "a10", "name": "Region 10", "parent": "a1", "owner": "alice", "owner_rights": "*:m @access:w @domain:w"}],
+  "members":  [{"user": "alice", "domain": "a10"}, {"external_user_id": "43", "domain": "a10"}],
+  "grants":   [{"user": "bob", "domain": "a10", "subdomains": true, "rights": "*:r vehicle:w"}]
+}
+```
+
+Users must exist first (`make import`). The file is checked completely, then written in one transaction;
+existing entries are updated, nothing is deleted. Command line: `make domain`, `make access USERNAME=bob`.
+
 ## Webhooks
 
 Account events are POSTed as JSON to `WEBHOOK_URLS`, signed with HMAC-SHA256 over a timestamp and the
@@ -240,7 +320,7 @@ body (`X-Auth-Server-Signature: t=…,v1=…`), after the response is sent. reso
 de-duplicates redeliveries.
 
 `user.created`, `user.login_succeeded`, `user.login_failed`, `user.locked`, `user.two_factor_enabled`,
-`user.two_factor_disabled`, `user.two_factor_postponed`, `user.roles_changed`, `impersonation.started`,
+`user.two_factor_disabled`, `user.two_factor_postponed`, `user.roles_changed`, `user.access_changed`, `impersonation.started`,
 `impersonation.ended`.
 
 Inside the server, the extension point is the Symfony event `App\Event\AccountEvent`.
@@ -252,7 +332,8 @@ Inside the server, the extension point is the Symfony event `App\Event\AccountEv
 | `make purge` | Removes expired tokens and DPoP replay entries, closes expired impersonations. Schedule it hourly |
 | `make 2fa-status` | 2FA roll-out progress |
 | `make impersonations` | Impersonation audit; `FLAG=--end=<id>` ends a session |
-| `make role` / `make client-policy` | Administrator roles, per-client DPoP policy |
+| `make role` / `make client-policy` | Platform roles; per-client DPoP policy and impersonation entry point |
+| `make domain` / `make access` / `make resource-type` | Domain tree and owners, a user's domain and rights, resource types |
 
 - The RSA signing keys live in the `auth-keys` volume. Resource servers fetch the public key from `/.well-known/jwks.json`.
 - Running several server replicas needs shared PHP sessions (`PdoSessionHandler` or Redis).

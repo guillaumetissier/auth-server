@@ -1,0 +1,78 @@
+{% extends 'admin/_layout.html.twig' %}
+
+{% block title %}{{ domain.name }}{% endblock %}
+
+{% block content %}
+    <p class="muted">
+        {% for a in ancestors %}<a href="{{ path('app_admin_domain', {code: a.code}) }}">{{ a.code }}</a> / {% endfor %}
+    </p>
+    <h1>{{ domain.name }} <span class="badge">{{ domain.code }}</span></h1>
+    <p class="sub expr">{{ domain.path }}</p>
+
+    <h2>Owner</h2>
+    <p class="help">The owner is the super user of the domain: he holds the owner rights on this domain and all its subdomains.
+        Add <code>@impersonate:r</code> (read-only) or <code>@impersonate:w</code> (full) to let him impersonate the users of his domain.</p>
+    {% if can_change_owner %}
+        <form method="post" action="{{ path('app_admin_domain_owner', {code: domain.code}) }}">
+            <div class="row">
+                <div><label for="owner">Owner (username, empty: none)</label><input type="text" id="owner" name="owner" value="{{ domain.owner ? domain.owner.username : '' }}"></div>
+                <div class="grow"><label for="owner-rights">Owner rights</label><input type="text" id="owner-rights" name="owner_rights" class="expr" value="{{ domain.ownerExpression }}" required></div>
+                <div><button type="submit">Save</button></div>
+            </div>
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_domain') }}">
+        </form>
+    {% else %}
+        <dl>
+            <dt>Owner</dt><dd>{{ domain.owner ? domain.owner.username : '—' }}</dd>
+            <dt>Owner rights</dt><dd class="expr">{{ domain.ownerExpression }}</dd>
+        </dl>
+    {% endif %}
+
+    <h2>Subdomains</h2>
+    {% if children is empty %}
+        <p class="muted">None.</p>
+    {% else %}
+        <table>
+            <thead><tr><th>Domain</th><th>Name</th><th>Owner</th></tr></thead>
+            <tbody>
+            {% for c in children %}
+                <tr><td><a href="{{ path('app_admin_domain', {code: c.code}) }}">{{ c.code }}</a></td><td>{{ c.name }}</td><td>{{ c.owner ? c.owner.username : '—' }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+    {% if can_create_subdomain %}
+        <h3>New subdomain</h3>
+        {% include 'admin/_domain_form.html.twig' with {parent: domain} %}
+    {% endif %}
+
+    {% if can_see_users %}
+        <h2>Users ({{ members|length }})</h2>
+        {% if members is empty %}
+            <p class="muted">Nobody belongs to this domain directly.</p>
+        {% else %}
+            <table>
+                <thead><tr><th>Username</th><th>User id</th><th>Two-factor</th><th></th></tr></thead>
+                <tbody>
+                {% for u in members %}
+                    <tr>
+                        <td><a href="{{ path('app_admin_user', {id: u.id}) }}">{{ u.username }}</a>{% if domain.owner and domain.owner.id == u.id %} <span class="badge">owner</span>{% endif %}</td>
+                        <td class="expr">{{ u.externalUserId }}</td>
+                        <td>{{ u.totpAuthenticationEnabled ? 'yes' : '—' }}</td>
+                        <td>{% if not u.enabled %}<span class="badge">disabled</span>{% endif %}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+        {% if can_add_members %}
+            <form method="post" action="{{ path('app_admin_domain_member', {code: domain.code}) }}">
+                <div class="row">
+                    <div class="grow"><label for="member">Move a user into this domain (username)</label><input type="text" id="member" name="username" required></div>
+                    <div><button type="submit" class="secondary">Move here</button></div>
+                </div>
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_domain') }}">
+            </form>
+        {% endif %}
+    {% endif %}
+{% endblock %}

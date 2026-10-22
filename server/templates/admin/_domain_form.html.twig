@@ -1,0 +1,9 @@
+<form method="post" action="{{ path('app_admin_domain_new') }}">
+    <div class="row">
+        <div><label for="new-code">Code</label><input type="text" id="new-code" name="code" required pattern="[a-z0-9][a-z0-9_\-]{0,62}" placeholder="a100"></div>
+        <div class="grow"><label for="new-name">Name</label><input type="text" id="new-name" name="name" required></div>
+        <div><button type="submit">Create</button></div>
+    </div>
+    <input type="hidden" name="parent" value="{{ parent ? parent.code : '' }}">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_domain') }}">
+</form>

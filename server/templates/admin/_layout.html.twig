@@ -1,0 +1,14 @@
+{% extends 'base.html.twig' %}
+
+{% block main_attributes %} class="wide"{% endblock %}
+
+{% block body %}
+    <nav class="admin" aria-label="Administration">
+        <a href="{{ path('app_admin_domains') }}">Domains</a>
+        <a href="{{ path('app_admin_users') }}">Users</a>
+        <a href="{{ path('app_admin_resource_types') }}">Resource types</a>
+        <span class="who">{{ actor.username }}{% if actor.domain %} · {{ actor.domain.path }}{% endif %}
+            · <a href="{{ path('app_account') }}">Account</a> · <a href="{{ path('app_logout') }}">Sign out</a></span>
+    </nav>
+    {% block content %}{% endblock %}
+{% endblock %}

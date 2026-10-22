@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Access\AccessPolicy;
 use App\Entity\User;
 use App\Event\AccountEvent;
 use App\OAuth\AuthorizationRequestListener;
@@ -35,6 +36,7 @@ final class AccountController extends AbstractController
         private readonly EntityManagerInterface $em,
         private readonly EventDispatcherInterface $dispatcher,
         private readonly ClockInterface $clock,
+        private readonly AccessPolicy $accessPolicy,
     ) {
     }
 
@@ -44,6 +46,7 @@ final class AccountController extends AbstractController
         return SecurityController::harden($this->render('account/index.html.twig', [
             'user' => $user = $this->user(),
             'can_disable' => $this->twoFactorPolicy->canDisable($user),
+            'can_administer' => $this->accessPolicy->canAdminister($user),
         ]));
     }
 

@@ -1,0 +1,32 @@
+{% extends 'admin/_layout.html.twig' %}
+
+{% block title %}Domains{% endblock %}
+
+{% block content %}
+    <h1>Domains</h1>
+    <p class="sub">Users only reach their own domain and its subdomains, never a parent or a sibling.</p>
+
+    {% if domains is empty %}
+        <p class="muted">No domain yet.</p>
+    {% else %}
+        <table>
+            <thead><tr><th>Domain</th><th>Name</th><th>Owner</th><th>Owner rights</th></tr></thead>
+            <tbody>
+            {% set base = domains|first.depth %}
+            {% for d in domains %}
+                <tr>
+                    <td><span class="tree" style="--depth: {{ d.depth - base }}"><a href="{{ path('app_admin_domain', {code: d.code}) }}">{{ d.code }}</a></span></td>
+                    <td>{{ d.name }}</td>
+                    <td>{{ d.owner ? d.owner.username : '—' }}</td>
+                    <td class="expr">{{ d.ownerExpression }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+
+    {% if can_create_root %}
+        <h2>New top-level domain</h2>
+        {% include 'admin/_domain_form.html.twig' with {parent: null} %}
+    {% endif %}
+{% endblock %}

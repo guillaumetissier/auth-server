@@ -1,7 +1,7 @@
 COMPOSE  = docker compose
 CONSOLE  = $(COMPOSE) exec auth-server php bin/console
 
-.PHONY: help secrets up down logs user import 2fa-status role impersonations client client-policy purge test
+.PHONY: help secrets up down logs user import 2fa-status role impersonations client client-policy resource-type domain access access-import purge test
 
 help: ## List the targets
 	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-14s %s\n", $$1, $$2}'
@@ -46,8 +46,22 @@ client: ## Create a public SPA client: make client ID=my-spa REDIRECT=http://loc
 		--redirect-uri=$(REDIRECT) --grant-type=authorization_code --grant-type=refresh_token \
 		--scope=profile --scope=offline_access $(SCOPES)
 
-client-policy: ## make client-policy ID=my-spa FLAG=--require-dpop (or --allow-bearer)
+client-policy: ## make client-policy ID=my-spa FLAG=--require-dpop (--allow-bearer, '--impersonation-uri=https://…?user={user}')
 	$(CONSOLE) app:client:policy $(ID) $(FLAG)
+
+resource-type: ## List resource types, or declare one: make resource-type CODE=vehicle LABEL=Vehicles (FLAG=--remove)
+	$(CONSOLE) app:resource-type $(CODE) $(if $(LABEL),"$(LABEL)") $(FLAG)
+
+domain: ## Domain tree; make domain CODE=a10 FLAG='--create="Region 10" --parent=a1' or FLAG='--owner=alice --owner-rights="*:m @access:w"'
+	$(CONSOLE) app:domain $(CODE) $(FLAG)
+
+access: ## A user's rights: make access USERNAME=bob [DOMAIN=a10 RIGHTS="*:r vehicle:w" FLAG=--subdomains] (FLAG=--revoke, --move=a10)
+	$(CONSOLE) app:access $(USERNAME) $(DOMAIN) $(if $(RIGHTS),"$(RIGHTS)") $(FLAG)
+
+access-import: ## Import domains and rights: make access-import FILE=access.json (FLAG=--dry-run)
+	$(COMPOSE) cp $(FILE) auth-server:/tmp/access-import.json
+	$(CONSOLE) app:access:import /tmp/access-import.json $(FLAG); status=$$?; \
+		$(COMPOSE) exec auth-server rm -f /tmp/access-import.json; exit $$status
 
 purge: ## Remove expired tokens and DPoP replay entries (schedule it, e.g. hourly)
 	$(CONSOLE) league:oauth2-server:clear-expired-tokens

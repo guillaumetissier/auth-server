@@ -1,0 +1,111 @@
+{% extends 'admin/_layout.html.twig' %}
+
+{% block title %}{{ target.username }}{% endblock %}
+
+{% block content %}
+    <h1>{{ target.username }}
+        {% if 'ROLE_SUPER_ADMIN' in target.roles %}<span class="badge">super-admin</span>{% elseif 'ROLE_ADMIN' in target.roles %}<span class="badge">admin</span>{% endif %}
+        {% if not target.enabled %}<span class="badge">disabled</span>{% endif %}
+    </h1>
+    <p class="sub">User id <span class="expr">{{ target.externalUserId }}</span> ·
+        {% if target.domain %}domain <a href="{{ path('app_admin_domain', {code: target.domain.code}) }}" class="expr">{{ target.domain.path }}</a>{% else %}no domain{% endif %}
+        · two-factor {{ target.totpAuthenticationEnabled ? 'enabled' : 'not enabled' }}</p>
+
+    {% if impersonation_mode %}
+        <h2>Impersonate</h2>
+        {% if impersonation_entry_points is empty %}
+            <p class="help">No application has an impersonation entry point yet
+                (<code>app:client:policy &lt;client&gt; --impersonation-uri="https://…/impersonate?user={user}"</code>).</p>
+        {% else %}
+            <p class="help">Opens the application, which asks you for a reason and a fresh authentication code, then signs you in as
+                {{ target.username }} — {{ impersonation_mode == 'full' ? 'with full rights' : 'read-only' }}.</p>
+            {% for e in impersonation_entry_points %}
+                <a class="button" href="{{ e.uri }}" rel="noopener">Impersonate in {{ e.name }}</a>
+            {% endfor %}
+        {% endif %}
+    {% endif %}
+
+    <h2>Rights</h2>
+    <table>
+        <thead><tr><th>Domain</th><th>Subdomains</th><th>Rights</th><th>Origin</th><th></th></tr></thead>
+        <tbody>
+        {% for g in grants %}
+            <tr>
+                <td class="expr">{{ g.domain.path }}</td>
+                <td>{{ g.includesSubdomains ? 'yes' : 'no' }}</td>
+                <td class="expr">{{ g.expression }}</td>
+                <td class="muted">granted{% if g.grantedBy %} by {{ g.grantedBy.username }}{% endif %}, {{ g.updatedAt|date('Y-m-d') }}</td>
+                <td class="num">{% if not change_denial %}
+                    <form method="post" action="{{ path('app_admin_user_revoke', {id: target.id, grant: g.id}) }}" class="inline">
+                        <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user') }}">
+                        <button type="submit" class="small danger">Remove</button>
+                    </form>
+                {% endif %}</td>
+            </tr>
+        {% endfor %}
+        {% for d in owned %}
+            <tr><td class="expr">{{ d.path }}</td><td>yes</td><td class="expr">{{ d.ownerExpression }}</td><td class="muted">owner of {{ d.code }}</td><td></td></tr>
+        {% endfor %}
+        {% if target.domain and default_expression %}
+            <tr><td class="expr">{{ target.domain.path }}</td><td>yes</td><td class="expr">{{ default_expression }}</td><td class="muted">default for everyone</td><td></td></tr>
+        {% endif %}
+        {% if grants is empty and owned is empty and (not target.domain or not default_expression) %}
+            <tr><td colspan="5" class="muted">No rights.</td></tr>
+        {% endif %}
+        </tbody>
+    </table>
+
+    {% if change_denial %}
+        <p class="help">{{ change_denial }}</p>
+    {% elseif grantable_domains is not empty %}
+        <h3>Grant or replace rights</h3>
+        <form method="post" action="{{ path('app_admin_user_grant', {id: target.id}) }}">
+            <div class="row">
+                <div><label for="g-domain">Domain</label>
+                    <select id="g-domain" name="domain">
+                        {% for d in grantable_domains %}<option value="{{ d.code }}">{{ d.path }}</option>{% endfor %}
+                    </select></div>
+                <div class="grow"><label for="g-rights">Rights</label><input type="text" id="g-rights" name="rights" class="expr" required placeholder="*:r vehicle:w user:w:own"></div>
+                <div><label class="check"><input type="checkbox" name="subdomains" value="1" checked> and subdomains</label></div>
+                <div><button type="submit">Save</button></div>
+            </div>
+            <p class="help">Types: {% for t in resource_types %}<code>{{ t.code }}</code> {% endfor %}{% for code, label in reserved_types %}<code title="{{ label }}">{{ code }}</code> {% endfor %}
+                · <a href="{{ path('app_admin_resource_types') }}">syntax</a>. You can never grant more than you hold yourself.</p>
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user') }}">
+        </form>
+    {% endif %}
+
+    {% if preview_domain %}
+        <h2>What it gives</h2>
+        <form method="get" class="row">
+            <div class="grow"><label for="p-domain">On domain</label>
+                <select id="p-domain" name="preview">
+                    {% for d in preview_domains %}<option value="{{ d.code }}" {{ d.id == preview_domain.id ? 'selected' }}>{{ d.path }}</option>{% endfor %}
+                </select></div>
+            <div><button type="submit" class="secondary">Show</button></div>
+        </form>
+        <table style="margin-top: 12px">
+            <thead><tr><th>Type</th><th>Any resource</th><th>Own resources</th></tr></thead>
+            <tbody>
+            {% for r in preview %}
+                <tr>
+                    <td><span class="expr">{{ r.type }}</span> <span class="muted">{{ r.reserved ? '' : r.label }}</span></td>
+                    <td>{% include 'admin/_level.html.twig' with {level: r.level} %}</td>
+                    <td>{% if r.own != r.level %}{% include 'admin/_level.html.twig' with {level: r.own} %}{% endif %}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        <p class="help">As resource servers compute it from the access token. Changes apply from the user's next token (refresh).</p>
+    {% endif %}
+
+    {% if can_change_roles %}
+        <h2>Platform role</h2>
+        <form method="post" action="{{ path('app_admin_user_roles', {id: target.id}) }}">
+            <label class="check"><input type="checkbox" name="admin" value="1" {{ 'ROLE_ADMIN' in target.roles ? 'checked' }}>
+                Platform administrator (sees every domain, impersonates read-only, changes nothing)</label>
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user') }}">
+            <button type="submit" class="secondary">Save</button>
+        </form>
+    {% endif %}
+{% endblock %}

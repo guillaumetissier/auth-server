@@ -78,6 +78,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TotpTwo
     #[ORM\Column]
     private bool $enabled = true;
 
+    /** The domain the user belongs to; null for users outside any domain (e.g. platform staff). */
+    #[ORM\ManyToOne(targetEntity: Domain::class)]
+    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    private ?Domain $domain = null;
+
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $lastLoginAt = null;
 
@@ -178,6 +183,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TotpTwo
     }
 
     // --- Account status -----------------------------------------------------------------
+
+    public function getDomain(): ?Domain
+    {
+        return $this->domain;
+    }
+
+    public function setDomain(?Domain $domain): void
+    {
+        $this->domain = $domain;
+    }
 
     public function isEnabled(): bool
     {

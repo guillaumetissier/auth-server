@@ -38,4 +38,37 @@ final class UserRepository extends ServiceEntityRepository implements PasswordUp
         $user->setPassword($newHashedPassword);
         $this->getEntityManager()->flush();
     }
+
+    /**
+     * Users matching $query (username or external id), optionally limited to a domain subtree.
+     *
+     * @param list<\App\Entity\Domain>|null $domains null: everybody; otherwise only members of these domains
+     *
+     * @return list<User>
+     */
+    public function search(string $query, ?array $domains, int $limit = 100): array
+    {
+        $qb = $this->createQueryBuilder('u')->leftJoin('u.domain', 'd')->addSelect('d')
+            ->orderBy('u.username', 'ASC')->setMaxResults($limit);
+        if ('' !== $query) {
+            $qb->andWhere('u.username LIKE :q OR u.externalUserId = :exact')
+                ->setParameter('q', '%'.addcslashes($query, '%_').'%')->setParameter('exact', $query);
+        }
+        if (null !== $domains) {
+            if ([] === $domains) {
+                return [];
+            }
+            $qb->andWhere('u.domain IN (:domains)')->setParameter('domains', $domains);
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * @return list<User>
+     */
+    public function membersOf(\App\Entity\Domain $domain, int $limit = 500): array
+    {
+        return $this->findBy(['domain' => $domain], ['username' => 'ASC'], $limit);
+    }
 }

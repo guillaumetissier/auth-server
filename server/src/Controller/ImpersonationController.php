@@ -93,7 +93,7 @@ final class ImpersonationController extends AbstractController
 
         return SecurityController::harden($this->render('impersonation/confirm.html.twig', [
             'target' => $target,
-            'mode' => $this->policy->modeFor($admin),
+            'mode' => $this->policy->modeFor($admin, $target),
             'ttl_minutes' => (int) round(((new \DateTimeImmutable('@0'))->add($this->policy->sessionTtl())->getTimestamp()) / 60),
             'reason' => $reason,
             'errors' => $errors,

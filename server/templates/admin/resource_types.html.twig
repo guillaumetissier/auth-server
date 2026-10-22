@@ -1,0 +1,52 @@
+{% extends 'admin/_layout.html.twig' %}
+
+{% block title %}Resource types{% endblock %}
+
+{% block content %}
+    <h1>Resource types</h1>
+    <p class="sub">The types used in access expressions. An expression naming an undeclared type is refused.</p>
+
+    <table>
+        <thead><tr><th>Type</th><th>Label</th><th></th></tr></thead>
+        <tbody>
+        {% for t in types %}
+            <tr>
+                <td class="expr">{{ t.code }}</td><td>{{ t.label }}</td>
+                <td class="num">{% if can_edit %}
+                    <form method="post" class="inline">
+                        <input type="hidden" name="code" value="{{ t.code }}"><input type="hidden" name="remove" value="1">
+                        <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_resource_type') }}">
+                        <button type="submit" class="small danger">Remove</button>
+                    </form>
+                {% endif %}</td>
+            </tr>
+        {% endfor %}
+        {% for code, label in reserved %}
+            <tr><td class="expr">{{ code }}</td><td>{{ label }} <span class="badge">built in</span></td><td></td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    {% if can_edit %}
+        <h2>Declare a type</h2>
+        <form method="post">
+            <div class="row">
+                <div><label for="rt-code">Code</label><input type="text" id="rt-code" name="code" required pattern="[a-z][a-z0-9_.\-]{0,62}" placeholder="vehicle"></div>
+                <div class="grow"><label for="rt-label">Label</label><input type="text" id="rt-label" name="label" placeholder="Vehicles"></div>
+                <div><button type="submit">Save</button></div>
+            </div>
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_resource_type') }}">
+        </form>
+    {% endif %}
+
+    <h2>Writing access expressions</h2>
+    <table>
+        <tbody>
+        <tr><td class="expr">vehicle:r</td><td>read vehicles (<code>-</code> none, <code>r</code> read, <code>w</code> write, <code>m</code> manage; each level includes the lower ones)</td></tr>
+        <tr><td class="expr">*:w tire:r</td><td>write everything, but only read tires: a named type beats <code>*</code>, whatever the order</td></tr>
+        <tr><td class="expr">*:r invoice:-</td><td>read everything except invoices</td></tr>
+        <tr><td class="expr">user:r user:w:own</td><td>read every profile, edit only one's own (<code>:own</code> = resources owned by the user)</td></tr>
+        <tr><td class="expr">@impersonate:r</td><td>reserved types start with <code>@</code> and are never covered by <code>*</code></td></tr>
+        </tbody>
+    </table>
+{% endblock %}

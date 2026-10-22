@@ -30,7 +30,7 @@ final readonly class ImpersonationManager
     public function start(User $admin, User $target, string $reason): ImpersonationSession
     {
         $denial = $this->policy->denialReason($admin, $target);
-        $mode = $this->policy->modeFor($admin);
+        $mode = $this->policy->modeFor($admin, $target);
         if (null !== $denial || null === $mode) {
             throw new \LogicException($denial ?? 'Not allowed to impersonate.');
         }
