@@ -6,27 +6,11 @@ one version number covers the server image and `@guillaumetissier/oauth-dpop-cli
 
 ## [Unreleased]
 
-### Added
-- PHPStan at level max with the Symfony and Doctrine extensions (`composer stan`, `make stan`, CI job).
-- End-to-end check over real HTTP (`tools/e2e.php`, `make e2e`), run in CI against the Docker image and MySQL.
-
-### Changed
-- README rewritten as a step-by-step guide (installation, development, production, usage); reference material moved to `docs/`.
-- `make up` returns once the stack is healthy; `make purge` works from cron; `make secrets` makes `.env.docker` readable by its owner only.
-
-### Fixed
-- Console commands run with `docker compose exec` (`make user`, `make client`...) could not reach MySQL:
-  DATABASE_URL was only composed by the start-up script. It is now composed by Symfony from the `MYSQL_*`
-  variables (`.env`), for every process of the container.
-
-### Changed
-- `app:access:import` validates the file into typed records before writing anything.
-- `symfony/var-exporter` is required explicitly (Doctrine lazy objects on PHP 8.3).
-
-## [1.0.0] - unreleased
+## [0.1.0] - 2026-10-22
 
 First public version.
 
+### Server
 - Authorization server: Authorization Code + PKCE (S256 mandatory), refresh tokens, RS256 JWT access tokens, JWKS and metadata endpoints.
 - DPoP (RFC 9449) at the token endpoint, DPoP-bound access and refresh tokens, per-client policy.
 - TOTP two-factor authentication with backup codes; roll-out modes `optional`, `grace` (with deadline) and `required`.
@@ -37,4 +21,15 @@ First public version.
   `user.access_changed` webhook; JSON import with dry run.
 - Administration pages: domains, users, rights with delegation bounds and preview, platform roles, resource
   types, Impersonate button through a per-client entry point. Impersonation by domain users holding `@impersonate`.
-- `oauth-dpop-client`: browser helper for PKCE, DPoP proofs, token refresh and impersonation.
+
+### Browser client
+- `@guillaumetissier/oauth-dpop-client`: browser helper for PKCE, DPoP proofs, token exchange and refresh, impersonation.
+
+### Deployment and tooling
+- Docker image (FrankenPHP) and Docker Compose stack with MySQL 8.4; `make` commands for every administration task.
+- Step-by-step README (installation, development, production, usage) and reference documentation in `docs/`.
+- Quality checks in CI: PHPUnit functional tests, PHPStan at level max, PHP-CS-Fixer, and an end-to-end
+  check over real HTTP (`tools/e2e.php`) against the Docker image and MySQL.
+
+[Unreleased]: https://github.com/guillaumetissier/auth-server/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/guillaumetissier/auth-server/releases/tag/v0.1.0

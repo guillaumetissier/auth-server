@@ -1,6 +1,6 @@
 {
   "name": "@guillaumetissier/oauth-dpop-client",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Browser OAuth2 client for Authorization Code + PKCE with DPoP-bound tokens (RFC 9449), WebCrypto only, zero dependencies.",
   "keywords": ["oauth2", "pkce", "dpop", "rfc9449", "webcrypto", "spa"],
   "license": "MIT",

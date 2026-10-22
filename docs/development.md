@@ -41,7 +41,7 @@ composer require guillaumetissier/resource-guard:@dev
 The server image and the npm package share one version number. Update `CHANGELOG.md`, then tag:
 
 ```bash
-git tag -a v1.0.0 -m "v1.0.0" && git push origin v1.0.0
+git tag -a v0.1.0 -m "v0.1.0" && git push origin v0.1.0
 ```
 
 GitHub Actions (`release.yml`) pushes the image to GitHub Container Registry and publishes the npm package
