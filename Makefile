@@ -1,7 +1,7 @@
 COMPOSE  = docker compose
 CONSOLE  = $(COMPOSE) exec auth-server php bin/console
 
-.PHONY: help secrets up down logs user import 2fa-status role impersonations client client-policy resource-type domain access access-import purge test cs fixcs stan
+.PHONY: help secrets up down logs user import 2fa-status role impersonations client client-policy resource-type domain access access-import purge test cs fixcs stan e2e
 
 help: ## List the targets
 	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-14s %s\n", $$1, $$2}'
@@ -78,3 +78,6 @@ fixcs: ## Fix the coding standard
 
 stan: ## Static analysis (PHPStan, level max)
 	composer stan
+
+e2e: ## End-to-end check of the running stack (make up first): login, 2FA, tokens, DPoP, refresh, impersonation
+	ISSUER=$${ISSUER:-http://localhost:8080} CONSOLE="$(COMPOSE) exec -T auth-server php bin/console" php tools/e2e.php

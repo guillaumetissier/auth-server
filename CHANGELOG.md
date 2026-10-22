@@ -8,6 +8,12 @@ one version number covers the server image and `@guillaumetissier/oauth-dpop-cli
 
 ### Added
 - PHPStan at level max with the Symfony and Doctrine extensions (`composer stan`, `make stan`, CI job).
+- End-to-end check over real HTTP (`tools/e2e.php`, `make e2e`), run in CI against the Docker image and MySQL.
+
+### Fixed
+- Console commands run with `docker compose exec` (`make user`, `make client`...) could not reach MySQL:
+  DATABASE_URL was only composed by the start-up script. It is now composed by Symfony from the `MYSQL_*`
+  variables (`.env`), for every process of the container.
 
 ### Changed
 - `app:access:import` validates the file into typed records before writing anything.

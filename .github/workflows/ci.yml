@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   server:
-    name: PHP unit (PHP ${{ matrix.php }})
+    name: server (PHP ${{ matrix.php }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -25,6 +25,32 @@ jobs:
           coverage: none
       - run: composer install --no-interaction --no-progress
       - run: vendor/bin/phpunit
+
+  e2e:
+    name: End-to-end (Docker image, MySQL, real HTTP)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, pdo_mysql, sodium, intl, curl
+          coverage: none
+      # The check script runs on the host and uses resource-guard and otphp from vendor/.
+      - run: composer install --no-interaction --no-progress
+      - run: make secrets
+      - name: Build and start the stack (migrations run at start-up)
+        run: docker compose up -d --build --wait --wait-timeout 180
+      - name: End-to-end scenarios
+        run: php tools/e2e.php
+        env:
+          ISSUER: http://localhost:8080
+          CONSOLE: docker compose exec -T auth-server php bin/console
+      - name: Server logs
+        if: failure()
+        run: docker compose logs
+      - if: always()
+        run: docker compose down -v
 
   static-analysis:
     name: Static analysis
@@ -65,17 +91,3 @@ jobs:
           node-version: 22
       - run: npm install --no-audit --no-fund
       - run: npm run build
-
-  docker:
-    name: Docker image builds
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: Dockerfile
-          push: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max

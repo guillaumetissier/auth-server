@@ -108,7 +108,15 @@ make test        # needs PHP 8.3+ and Composer
 make cs          # checks the coding standard (PHP-CS-Fixer, Symfony rules), changes nothing
 make fixcs       # fixes it
 make stan        # static analysis (PHPStan, level max, Symfony and Doctrine extensions)
+make e2e         # end-to-end check of the running stack (after make up)
 ```
+
+`make e2e` (`tools/e2e.php`) drives the running server over real HTTP, as a browser and a client would:
+login with CSRF, 2FA enrollment then TOTP, authorization code with PKCE, DPoP-bound tokens checked by
+resource-guard, domain rights in the token, refresh-token rotation and key binding, CORS, read-only
+impersonation and its end, and the attacks that must fail. It creates its own client and users, so it
+can run again on the same database. The CI runs it against the Docker image and MySQL, which also
+checks the image build, the start-up script and the migrations.
 
 The server has 40 functional tests on SQLite covering the complete flow (login, TOTP,
 PKCE, DPoP-bound tokens, key-bound refresh), 2FA roll-out, import, lockout, CORS, impersonation, domains,
