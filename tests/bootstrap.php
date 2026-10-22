@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Symfony\Component\Dotenv\Dotenv;
 
 require dirname(__DIR__).'/vendor/autoload.php';
@@ -10,7 +12,7 @@ require dirname(__DIR__).'/vendor/autoload.php';
 $keyDir = dirname(__DIR__).'/var/test-keys';
 if (!is_file($keyDir.'/private.pem')) {
     @mkdir($keyDir, 0700, true);
-    $key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
+    $key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => \OPENSSL_KEYTYPE_RSA]);
     openssl_pkey_export($key, $privatePem);
     file_put_contents($keyDir.'/private.pem', $privatePem);
     chmod($keyDir.'/private.pem', 0600);

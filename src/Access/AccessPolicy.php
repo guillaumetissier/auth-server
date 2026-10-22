@@ -19,11 +19,11 @@ use GuillaumeTissier\ResourceGuard\Access\DomainPath;
  *
  *  - ROLE_SUPER_ADMIN: everything, everywhere;
  *  - ROLE_ADMIN: sees everything, changes nothing (read-only platform staff);
- *  - domain users: what their own rights say, through the reserved types
- *      @access  r = see the rights of the users of a domain, w = change them;
- *      @domain  r = see subdomains, w = create subdomains and set their owner and owner rights;
- *    and never beyond their own rights: a grant, an owner expression, is always checked against
- *    what the actor holds himself on that domain (and on all its subdomains when it extends to them).
+ *  - domain users: what their own rights say, through the reserved types "@access" (r = see the
+ *    rights of the users of a domain, w = change them) and "@domain" (r = see subdomains, w = create
+ *    subdomains and set their owner and owner rights), and never beyond their own rights: a grant,
+ *    an owner expression, is always checked against what the actor holds himself on that domain
+ *    (and on all its subdomains when it extends to them).
  *  - nobody changes his own rights, nor those of the owner of his domain or of any domain above it.
  */
 final readonly class AccessPolicy

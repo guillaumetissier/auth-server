@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional;
 
+use App\Tests\Support\RecordingHttpClient;
 use GuillaumeTissier\ResourceGuard\Client\DpopProofFactory;
 use GuillaumeTissier\ResourceGuard\Dpop\DpopProofValidator;
 use GuillaumeTissier\ResourceGuard\Dpop\InMemoryReplayStore;
@@ -13,7 +14,6 @@ use GuillaumeTissier\ResourceGuard\Token\AccessTokenValidator;
 use GuillaumeTissier\ResourceGuard\Token\StaticJwksProvider;
 use GuillaumeTissier\ResourceGuard\Webhook\WebhookEvent;
 use GuillaumeTissier\ResourceGuard\Webhook\WebhookSignature;
-use App\Tests\Support\RecordingHttpClient;
 
 /**
  * The complete journey: browser login + TOTP, Authorization Code + PKCE, DPoP-bound tokens,

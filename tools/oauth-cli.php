@@ -114,8 +114,8 @@ final class OAuthCli
             }
         }
 
-        echo $this->issuer.'/authorize?'.http_build_query($params, '', '&', PHP_QUERY_RFC3986)."\n";
-        fwrite(STDERR, "state={$state} (check it in the redirect), verifier saved\n");
+        echo $this->issuer.'/authorize?'.http_build_query($params, '', '&', \PHP_QUERY_RFC3986)."\n";
+        fwrite(\STDERR, "state={$state} (check it in the redirect), verifier saved\n");
 
         return 0;
     }
@@ -175,7 +175,7 @@ final class OAuthCli
     {
         [$h, $p] = explode('.', $jwt);
         $dec = static fn (string $s) => json_decode(base64_decode(strtr($s, '-_', '+/')), true);
-        echo json_encode(['header' => $dec($h), 'claims' => $dec($p)], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";
+        echo json_encode(['header' => $dec($h), 'claims' => $dec($p)], \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES)."\n";
 
         return 0;
     }
@@ -188,7 +188,7 @@ final class OAuthCli
 
         [$status, $jwks] = $this->http('GET', $this->issuer.'/.well-known/jwks.json');
         if (200 !== $status) {
-            fwrite(STDERR, "Cannot fetch JWKS (HTTP {$status})\n");
+            fwrite(\STDERR, "Cannot fetch JWKS (HTTP {$status})\n");
 
             return 1;
         }
@@ -256,20 +256,20 @@ final class OAuthCli
     {
         $ch = curl_init($url);
         curl_setopt_array($ch, [
-            CURLOPT_CUSTOMREQUEST => $method,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER => $headers,
-            CURLOPT_TIMEOUT => 10,
+            \CURLOPT_CUSTOMREQUEST => $method,
+            \CURLOPT_RETURNTRANSFER => true,
+            \CURLOPT_HTTPHEADER => $headers,
+            \CURLOPT_TIMEOUT => 10,
         ]);
         if (null !== $body) {
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+            curl_setopt($ch, \CURLOPT_POSTFIELDS, $body);
         }
         $response = curl_exec($ch);
         if (false === $response) {
             throw new RuntimeException('HTTP error: '.curl_error($ch));
         }
 
-        return [(int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE), (string) $response];
+        return [(int) curl_getinfo($ch, \CURLINFO_RESPONSE_CODE), (string) $response];
     }
 
     private function options(array $args): array
@@ -288,7 +288,7 @@ final class OAuthCli
 
     private function save(string $file, array $data): void
     {
-        file_put_contents($this->stateDir.'/'.$file, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        file_put_contents($this->stateDir.'/'.$file, json_encode($data, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES));
         chmod($this->stateDir.'/'.$file, 0600);
     }
 
@@ -313,6 +313,6 @@ final class OAuthCli
 try {
     exit((new OAuthCli())->run($argv));
 } catch (Throwable $e) {
-    fwrite(STDERR, 'Error: '.$e->getMessage()."\n");
+    fwrite(\STDERR, 'Error: '.$e->getMessage()."\n");
     exit(2);
 }

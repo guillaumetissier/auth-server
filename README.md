@@ -105,6 +105,8 @@ The dev keys above are for local use only: production values come from `make sec
 
 ```bash
 make test        # needs PHP 8.3+ and Composer
+make cs          # checks the coding standard (PHP-CS-Fixer, Symfony rules), changes nothing
+make fixcs       # fixes it
 ```
 
 The server has 40 functional tests on SQLite covering the complete flow (login, TOTP,

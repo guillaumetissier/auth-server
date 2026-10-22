@@ -6,10 +6,10 @@ namespace App\TwoFactor;
 
 use App\Entity\User;
 use App\Event\AccountEvent;
-use GuillaumeTissier\ResourceGuard\Webhook\WebhookEvent;
 use Doctrine\ORM\EntityManagerInterface;
 use Endroid\QrCode\Builder\Builder;
 use Endroid\QrCode\Writer\SvgWriter;
+use GuillaumeTissier\ResourceGuard\Webhook\WebhookEvent;
 use Psr\Clock\ClockInterface;
 use Scheb\TwoFactorBundle\Model\Totp\TotpConfiguration;
 use Scheb\TwoFactorBundle\Model\Totp\TotpConfigurationInterface;

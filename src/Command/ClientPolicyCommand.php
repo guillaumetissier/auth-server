@@ -63,7 +63,11 @@ final readonly class ClientPolicyCommand
         $io->success(\sprintf(
             'Client "%s": DPoP %s, impersonation entry point: %s.',
             $client,
-            match ($policy->requiresDpop()) { true => 'required', false => 'optional', null => 'as DPOP_REQUIRED_BY_DEFAULT' },
+            match ($policy->requiresDpop()) {
+                true => 'required',
+                false => 'optional',
+                null => 'as DPOP_REQUIRED_BY_DEFAULT',
+            },
             $policy->getImpersonationStartUri() ?? 'none',
         ));
 

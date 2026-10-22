@@ -24,7 +24,7 @@ final class Version20261021160000 extends AbstractMigration
 
         // JSON columns cannot take a literal default: add nullable, fill, then enforce NOT NULL.
         $this->addSql('ALTER TABLE users ADD roles JSON DEFAULT NULL AFTER external_user_id');
-        $this->addSql("UPDATE users SET roles = JSON_ARRAY()");
+        $this->addSql('UPDATE users SET roles = JSON_ARRAY()');
         $this->addSql('ALTER TABLE users MODIFY roles JSON NOT NULL');
 
         $this->addSql('CREATE TABLE impersonation_session (id VARCHAR(36) NOT NULL, mode VARCHAR(16) NOT NULL, reason VARCHAR(500) NOT NULL, started_at DATETIME NOT NULL, expires_at DATETIME NOT NULL, ended_at DATETIME DEFAULT NULL, end_reason VARCHAR(32) DEFAULT NULL, admin_id INT UNSIGNED NOT NULL, target_id INT UNSIGNED NOT NULL, INDEX idx_impersonation_expires_at (expires_at), INDEX IDX_C7AA2315642B8210 (admin_id), INDEX IDX_C7AA2315158E0B66 (target_id), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4');
