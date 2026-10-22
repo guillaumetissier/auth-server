@@ -13,7 +13,7 @@
         "ext-openssl": "*",
         "ext-pdo_mysql": "*",
         "ext-sodium": "*",
-        "guillaumetissier/resource-guard": "^1.0",
+        "guillaumetissier/resource-guard": "^0.1",
         "doctrine/doctrine-bundle": "^2.13",
         "doctrine/doctrine-migrations-bundle": "^3.4",
         "doctrine/orm": "^3.3",
@@ -41,6 +41,8 @@
         "web-token/jwt-library": "^4.0"
     },
     "require-dev": {
+        "ext-pdo_sqlite": "*",
+        "friendsofphp/php-cs-fixer": "^3.95",
         "phpunit/phpunit": "^12.0",
         "symfony/browser-kit": "7.4.*",
         "symfony/css-selector": "7.4.*",
@@ -65,6 +67,13 @@
         "allow-plugins": false
     },
     "scripts": {
-        "test": "phpunit"
+        "test": "phpunit",
+        "cs": "php-cs-fixer fix --dry-run --diff",
+        "fixcs": "php-cs-fixer fix"
+    },
+    "scripts-descriptions": {
+        "test": "Runs the test suite",
+        "cs": "Checks the coding standard (no change)",
+        "fixcs": "Fixes the coding standard"
     }
 }

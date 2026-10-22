@@ -22,7 +22,9 @@ database (`external_user_id`), so your application keeps owning its users, roles
 
 | Path | What it is |
 |---|---|
-| `server/` | The authorization server: Symfony 7.4, league/oauth2-server-bundle, scheb/2fa, Twig login pages |
+| `src/`, `config/`, `templates/`, `migrations/`, `tests/` | The authorization server, a Symfony 7.4 application (league/oauth2-server-bundle, scheb/2fa, Twig login pages) |
+| `docker/`, `Dockerfile` | Image: FrankenPHP, PHP settings, start-up script |
+| `.env` / `.env.docker.example` | Symfony defaults (committed, no secrets) / Docker Compose settings, copied to `.env.docker` with its secrets by `make secrets` |
 | `packages/dpop-client-ts/` | [`@guillaumetissier/oauth-dpop-client`](https://www.npmjs.com/package/@guillaumetissier/oauth-dpop-client): dependency-free TypeScript helper for browser applications: PKCE, DPoP proofs (WebCrypto), token exchange and refresh. See its [README](packages/dpop-client-ts/README.md) |
 | `tools/` | `oauth-cli.php` (plays the browser client and a resource server from the command line) and `webhook-receiver.php`, for manual testing |
 | `docker-compose.yml` | `auth-server` (FrankenPHP) and `auth-db` (MySQL 8.4) on a private network |
@@ -46,8 +48,7 @@ Requirements: Docker with Compose, `make`, `openssl`. PHP 8.3+ and Composer on t
 command-line test tool and the test suites.
 
 ```bash
-cp .env.example .env
-make secrets       # fills APP_SECRET, MySQL passwords and encryption keys with random values
+make secrets       # creates .env.docker with random secrets (APP_SECRET, MySQL passwords, encryption keys)
 make up            # builds and starts; first start generates the RSA signing keys and runs the migrations
 
 curl http://localhost:8080/health                      # {"status":"ok"}
@@ -66,7 +67,7 @@ make role USERNAME=alice ROLE=ROLE_ADMIN               # optional: lets alice im
 Try the whole flow without writing a client, with the command-line tool:
 
 ```bash
-(cd server && composer install)                # the tools use the server's dependencies
+composer install                             # the tools use the server's dependencies
 php tools/oauth-cli.php authorize-url        # open the printed URL, log in, set up 2FA (or click "Later")
 # the browser ends on http://localhost:5173/callback?code=…  (nothing listens there: copy the code)
 php tools/oauth-cli.php token <CODE>         # exchanges it with a DPoP proof
@@ -81,7 +82,6 @@ Importing existing users is optional (see [Migrating existing users](#migrating-
 Requirements: PHP 8.3+ with `pdo_sqlite`, `sodium`, `intl`, and Composer.
 
 ```bash
-cd server
 composer install
 cat > .env.local <<'EOF'
 APP_ENV=dev
@@ -113,7 +113,8 @@ rights, delegation bounds and the administration pages.
 
 ## Configuration
 
-All settings are environment variables (`.env` for Docker Compose).
+All settings are environment variables: `.env.docker` with Docker Compose (`make secrets` creates it), `.env.local`
+without Docker. `.env` only holds the defaults.
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -337,7 +338,7 @@ Inside the server, the extension point is the Symfony event `App\Event\AccountEv
 
 - The RSA signing keys live in the `auth-keys` volume. Resource servers fetch the public key from `/.well-known/jwks.json`.
 - Running several server replicas needs shared PHP sessions (`PdoSessionHandler` or Redis).
-- The DPoP replay store is MySQL; a Redis implementation of `ReplayStoreInterface` (`SET key NX EX ttl`) is a one-line swap in `server/config/services.yaml`.
+- The DPoP replay store is MySQL; a Redis implementation of `ReplayStoreInterface` (`SET key NX EX ttl`) is a one-line swap in `config/services.yaml`.
 
 ## Roadmap
 
@@ -363,8 +364,7 @@ and has its own versions.
 Clone both repositories side by side and point the server at the local copy (do not commit this):
 
 ```bash
-cd server
-composer config repositories.resource-guard '{"type": "path", "url": "../../resource-guard"}'
+composer config repositories.resource-guard '{"type": "path", "url": "../resource-guard"}'
 composer require guillaumetissier/resource-guard:@dev
 ```
 

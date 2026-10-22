@@ -8,7 +8,7 @@ declare(strict_types=1);
  *   WEBHOOK_SECRET=... php -S 0.0.0.0:9000 tools/webhook-receiver.php
  */
 
-require __DIR__.'/../server/vendor/autoload.php';
+require __DIR__.'/../vendor/autoload.php';
 
 use GuillaumeTissier\ResourceGuard\Webhook\WebhookEvent;
 use GuillaumeTissier\ResourceGuard\Webhook\WebhookSignature;

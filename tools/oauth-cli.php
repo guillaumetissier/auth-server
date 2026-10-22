@@ -11,7 +11,7 @@ declare(strict_types=1);
  * State (PKCE verifier, DPoP key, last tokens) is kept in .oauth-cli/ next to this file's parent.
  */
 
-require __DIR__.'/../server/vendor/autoload.php';
+require __DIR__.'/../vendor/autoload.php';
 
 use GuillaumeTissier\ResourceGuard\Client\DpopProofFactory;
 use GuillaumeTissier\ResourceGuard\Dpop\DpopProofValidator;
