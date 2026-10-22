@@ -1,0 +1,39 @@
+# --- Secrets and local configuration ---
+/.env
+/server/.env.local
+/server/.env.*.local
+/docker-compose.override.yml
+# RSA signing keys and any other key material
+*.pem
+*.key
+# User exports for "make import" (contain password hashes)
+/users*.csv
+
+# --- PHP / Symfony ---
+/server/vendor/
+/server/var/
+/server/public/bundles/
+/server/.phpunit.result.cache
+.phpunit.cache/
+.phpunit.result.cache
+.php-cs-fixer.cache
+composer.local.json
+composer.local.lock
+
+# --- Node / TypeScript ---
+node_modules/
+/packages/dpop-client-ts/dist/
+*.tgz
+npm-debug.log*
+
+# --- Local tools ---
+# Key and tokens of tools/oauth-cli.php
+/.oauth-cli/
+
+# --- Editors and OS ---
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Webhook;
 
 use App\Event\AccountEvent;
-use GuillaumeTissier\OAuthResourceGuard\Webhook\WebhookEvent;
-use GuillaumeTissier\OAuthResourceGuard\Webhook\WebhookSignature;
+use GuillaumeTissier\ResourceGuard\Webhook\WebhookEvent;
+use GuillaumeTissier\ResourceGuard\Webhook\WebhookSignature;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\ConsoleEvents;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;

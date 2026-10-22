@@ -6,7 +6,7 @@ namespace App\Tests\Functional;
 
 use App\Entity\User;
 use App\TwoFactor\TwoFactorPolicy;
-use GuillaumeTissier\OAuthResourceGuard\Webhook\WebhookEvent;
+use GuillaumeTissier\ResourceGuard\Webhook\WebhookEvent;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Tester\CommandTester;
 

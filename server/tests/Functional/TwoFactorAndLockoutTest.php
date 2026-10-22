@@ -6,7 +6,7 @@ namespace App\Tests\Functional;
 
 use App\Entity\User;
 use App\Security\LoginAttemptSubscriber;
-use GuillaumeTissier\OAuthResourceGuard\Webhook\WebhookEvent;
+use GuillaumeTissier\ResourceGuard\Webhook\WebhookEvent;
 
 final class TwoFactorAndLockoutTest extends OAuthTestCase
 {

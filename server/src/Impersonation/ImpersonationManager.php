@@ -8,7 +8,7 @@ use App\Entity\ImpersonationLink;
 use App\Entity\ImpersonationSession;
 use App\Entity\User;
 use App\Event\AccountEvent;
-use GuillaumeTissier\OAuthResourceGuard\Webhook\WebhookEvent;
+use GuillaumeTissier\ResourceGuard\Webhook\WebhookEvent;
 use Doctrine\ORM\EntityManagerInterface;
 use League\OAuth2\Server\Exception\OAuthServerException;
 use Psr\Clock\ClockInterface;

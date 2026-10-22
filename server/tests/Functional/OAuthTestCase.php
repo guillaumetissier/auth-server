@@ -7,7 +7,7 @@ namespace App\Tests\Functional;
 use App\Entity\User;
 use App\Tests\Support\RecordingHttpClient;
 use App\TwoFactor\TotpEnrollment;
-use GuillaumeTissier\OAuthResourceGuard\Client\DpopProofFactory;
+use GuillaumeTissier\ResourceGuard\Client\DpopProofFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use League\Bundle\OAuth2ServerBundle\Manager\ClientManagerInterface;

@@ -7,7 +7,7 @@ namespace App\Command;
 use App\Entity\User;
 use App\Event\AccountEvent;
 use App\Repository\UserRepository;
-use GuillaumeTissier\OAuthResourceGuard\Webhook\WebhookEvent;
+use GuillaumeTissier\ResourceGuard\Webhook\WebhookEvent;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\AsCommand;

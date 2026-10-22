@@ -4,20 +4,20 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional;
 
-use GuillaumeTissier\OAuthResourceGuard\Client\DpopProofFactory;
-use GuillaumeTissier\OAuthResourceGuard\Dpop\DpopProofValidator;
-use GuillaumeTissier\OAuthResourceGuard\Dpop\InMemoryReplayStore;
-use GuillaumeTissier\OAuthResourceGuard\Guard\AuthenticationFailed;
-use GuillaumeTissier\OAuthResourceGuard\Guard\ResourceGuard;
-use GuillaumeTissier\OAuthResourceGuard\Token\AccessTokenValidator;
-use GuillaumeTissier\OAuthResourceGuard\Token\StaticJwksProvider;
-use GuillaumeTissier\OAuthResourceGuard\Webhook\WebhookEvent;
-use GuillaumeTissier\OAuthResourceGuard\Webhook\WebhookSignature;
+use GuillaumeTissier\ResourceGuard\Client\DpopProofFactory;
+use GuillaumeTissier\ResourceGuard\Dpop\DpopProofValidator;
+use GuillaumeTissier\ResourceGuard\Dpop\InMemoryReplayStore;
+use GuillaumeTissier\ResourceGuard\Guard\AuthenticationFailed;
+use GuillaumeTissier\ResourceGuard\Guard\ResourceGuard;
+use GuillaumeTissier\ResourceGuard\Token\AccessTokenValidator;
+use GuillaumeTissier\ResourceGuard\Token\StaticJwksProvider;
+use GuillaumeTissier\ResourceGuard\Webhook\WebhookEvent;
+use GuillaumeTissier\ResourceGuard\Webhook\WebhookSignature;
 use App\Tests\Support\RecordingHttpClient;
 
 /**
  * The complete journey: browser login + TOTP, Authorization Code + PKCE, DPoP-bound tokens,
- * verification by a resource server using the resource-guard package, refresh token rotation.
+ * verification by a resource server using guillaumetissier/resource-guard, refresh token rotation.
  */
 final class AuthorizationCodeFlowTest extends OAuthTestCase
 {

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
-use GuillaumeTissier\OAuthResourceGuard\Dpop\DpopProofValidator;
+use GuillaumeTissier\ResourceGuard\Dpop\DpopProofValidator;
 use Jose\Component\KeyManagement\JWKFactory;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\AsController;

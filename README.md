@@ -23,7 +23,6 @@ database (`external_user_id`), so your application keeps owning its users, roles
 | Path | What it is |
 |---|---|
 | `server/` | The authorization server: Symfony 7.4, league/oauth2-server-bundle, scheb/2fa, Twig login pages |
-| `packages/resource-guard/` | [`guillaumetissier/oauth-resource-guard`](https://packagist.org/packages/guillaumetissier/oauth-resource-guard): Composer library for resource servers: access token and DPoP proof validation, webhook verification. Laravel, Symfony and PSR-15 adapters. See its [README](packages/resource-guard/README.md) |
 | `packages/dpop-client-ts/` | [`@guillaumetissier/oauth-dpop-client`](https://www.npmjs.com/package/@guillaumetissier/oauth-dpop-client): dependency-free TypeScript helper for browser applications: PKCE, DPoP proofs (WebCrypto), token exchange and refresh. See its [README](packages/dpop-client-ts/README.md) |
 | `tools/` | `oauth-cli.php` (plays the browser client and a resource server from the command line) and `webhook-receiver.php`, for manual testing |
 | `docker-compose.yml` | `auth-server` (FrankenPHP) and `auth-db` (MySQL 8.4) on a private network |
@@ -33,7 +32,7 @@ database (`external_user_id`), so your application keeps owning its users, roles
 | Part | Install |
 |---|---|
 | Server | Docker image `ghcr.io/guillaumetissier/auth-server` (tags `1`, `1.0`, `1.0.0`), or build it from this repository |
-| API protection (PHP) | `composer require guillaumetissier/oauth-resource-guard` |
+| API protection (PHP) | `composer require guillaumetissier/resource-guard` |
 | Browser client | `npm install @guillaumetissier/oauth-dpop-client` |
 
 To run the published image instead of building it, replace `build:` by
@@ -67,7 +66,7 @@ make role USERNAME=alice ROLE=ROLE_ADMIN               # optional: lets alice im
 Try the whole flow without writing a client, with the command-line tool:
 
 ```bash
-cd packages/resource-guard && composer install && cd ../..
+(cd server && composer install)                # the tools use the server's dependencies
 php tools/oauth-cli.php authorize-url        # open the printed URL, log in, set up 2FA (or click "Later")
 # the browser ends on http://localhost:5173/callback?code=…  (nothing listens there: copy the code)
 php tools/oauth-cli.php token <CODE>         # exchanges it with a DPoP proof
@@ -105,11 +104,10 @@ The dev keys above are for local use only: production values come from `make sec
 ### Tests
 
 ```bash
-make test        # runs both suites; needs PHP 8.3+ and Composer
+make test        # needs PHP 8.3+ and Composer
 ```
 
-`packages/resource-guard` has 33 tests (DPoP proofs, stolen and forged tokens, impersonation rules,
-webhook signatures). `server` has 30 functional tests on SQLite covering the complete flow (login, TOTP,
+The server has 30 functional tests on SQLite covering the complete flow (login, TOTP,
 PKCE, DPoP-bound tokens, key-bound refresh), 2FA roll-out, import, lockout, CORS and impersonation.
 
 ## Configuration
@@ -177,7 +175,8 @@ postponed and their last login).
 
 ## Protecting an API (resource server)
 
-Install `packages/resource-guard` in the application serving the API. It validates tokens offline with
+Install [`guillaumetissier/resource-guard`](https://github.com/guillaumetissier/resource-guard) in the
+application serving the API (`composer require guillaumetissier/resource-guard`). It validates tokens offline with
 the server's JWKS and checks DPoP proofs. Laravel in short:
 
 ```php
@@ -187,7 +186,7 @@ Route::middleware('auth.oauth:no-impersonation')->post('/api/password', ...); //
 ```
 
 Setup for Laravel, Symfony and PSR-15, the `Principal` API and webhook handling are described in the
-[resource-guard README](packages/resource-guard/README.md).
+[resource-guard README](https://github.com/guillaumetissier/resource-guard#readme).
 
 To reach the server from another Compose project, join its network:
 
@@ -268,16 +267,27 @@ Inside the server, the extension point is the Symfony event `App\Event\AccountEv
 
 ## Releasing
 
-One version number covers the three parts. Update `CHANGELOG.md`, then tag:
+The server image and the npm package share one version number. Update `CHANGELOG.md`, then tag:
 
 ```bash
 git tag v1.0.0 && git push origin v1.0.0
 ```
 
-GitHub Actions then pushes the image to GitHub Container Registry (`release.yml`), publishes the npm
-package (`release.yml`, needs the `NPM_TOKEN` secret) and copies `packages/resource-guard` with the tag
-to the read-only repository `guillaumetissier/oauth-resource-guard`, which Packagist watches
-(`split.yml`, needs the `SPLIT_TOKEN` secret).
+GitHub Actions (`release.yml`) then pushes the image to GitHub Container Registry and publishes the npm
+package (needs the `NPM_TOKEN` secret). `guillaumetissier/resource-guard` lives in its own repository
+and has its own versions.
+
+### Working on resource-guard and the server together
+
+Clone both repositories side by side and point the server at the local copy (do not commit this):
+
+```bash
+cd server
+composer config repositories.resource-guard '{"type": "path", "url": "../../resource-guard"}'
+composer require guillaumetissier/resource-guard:@dev
+```
+
+`git checkout composer.json composer.lock && composer install` goes back to the published version.
 
 ## License
 

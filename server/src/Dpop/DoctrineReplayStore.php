@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Dpop;
 
-use GuillaumeTissier\OAuthResourceGuard\Dpop\ReplayStoreInterface;
+use GuillaumeTissier\ResourceGuard\Dpop\ReplayStoreInterface;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\DBAL\Types\Types;

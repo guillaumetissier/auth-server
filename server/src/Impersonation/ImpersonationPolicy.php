@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Impersonation;
 
 use App\Entity\User;
-use GuillaumeTissier\OAuthResourceGuard\Token\Impersonation;
+use GuillaumeTissier\ResourceGuard\Token\Impersonation;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**

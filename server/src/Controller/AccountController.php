@@ -9,7 +9,7 @@ use App\Event\AccountEvent;
 use App\OAuth\AuthorizationRequestListener;
 use App\TwoFactor\TotpEnrollment;
 use App\TwoFactor\TwoFactorPolicy;
-use GuillaumeTissier\OAuthResourceGuard\Webhook\WebhookEvent;
+use GuillaumeTissier\ResourceGuard\Webhook\WebhookEvent;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Clock\ClockInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

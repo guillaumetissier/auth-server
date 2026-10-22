@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 #
-# Auth server image. Build context = repository root (the server depends on packages/resource-guard):
+# Auth server image. Build context = repository root:
 #   docker build -f server/Dockerfile -t auth-server .
 
 ARG PHP_VERSION=8.4
@@ -23,15 +23,11 @@ FROM base AS vendor
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 ENV COMPOSER_ALLOW_SUPERUSER=1
 
-COPY packages/resource-guard /packages/resource-guard
 COPY server/composer.json server/composer.lock* ./
-# The path repository points to ../packages/resource-guard: make that path valid inside the image.
-RUN sed -i 's#"../packages/resource-guard"#"/packages/resource-guard"#' composer.json \
- && composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-progress --no-interaction
+RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-progress --no-interaction
 
 COPY server/ ./
-RUN sed -i 's#"../packages/resource-guard"#"/packages/resource-guard"#' composer.json \
- && composer dump-autoload --no-dev --classmap-authoritative \
+RUN composer dump-autoload --no-dev --classmap-authoritative \
  && rm -rf tests phpunit.xml.dist .env.test var
 
 ########## Runtime ##########

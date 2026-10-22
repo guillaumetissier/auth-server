@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Dpop;
 
-use GuillaumeTissier\OAuthResourceGuard\Dpop\DpopException;
-use GuillaumeTissier\OAuthResourceGuard\Dpop\DpopProofValidator;
+use GuillaumeTissier\ResourceGuard\Dpop\DpopException;
+use GuillaumeTissier\ResourceGuard\Dpop\DpopProofValidator;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;

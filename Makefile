@@ -53,6 +53,5 @@ purge: ## Remove expired tokens and DPoP replay entries (schedule it, e.g. hourl
 	$(CONSOLE) league:oauth2-server:clear-expired-tokens
 	$(CONSOLE) app:purge
 
-test: ## Run both test suites locally (needs PHP 8.3+ and composer)
-	cd packages/resource-guard && composer install -q && vendor/bin/phpunit
+test: ## Run the server test suite locally (needs PHP 8.3+ and composer)
 	cd server && composer install -q && vendor/bin/phpunit

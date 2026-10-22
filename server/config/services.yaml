@@ -28,11 +28,11 @@ services:
     League\Bundle\OAuth2ServerBundle\Converter\UserConverterInterface: '@App\OAuth\ExternalIdUserConverter'
 
     # --- DPoP ---------------------------------------------------------------------------
-    GuillaumeTissier\OAuthResourceGuard\Dpop\ReplayStoreInterface: '@App\Dpop\DoctrineReplayStore'
+    GuillaumeTissier\ResourceGuard\Dpop\ReplayStoreInterface: '@App\Dpop\DoctrineReplayStore'
 
-    GuillaumeTissier\OAuthResourceGuard\Dpop\DpopProofValidator:
+    GuillaumeTissier\ResourceGuard\Dpop\DpopProofValidator:
         arguments:
-            $replayStore: '@GuillaumeTissier\OAuthResourceGuard\Dpop\ReplayStoreInterface'
+            $replayStore: '@GuillaumeTissier\ResourceGuard\Dpop\ReplayStoreInterface'
             $clock: '@clock'
             $maxAgeSeconds: 300
             $leewaySeconds: 30

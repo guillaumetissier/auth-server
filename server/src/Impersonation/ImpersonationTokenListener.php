@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Impersonation;
 
-use GuillaumeTissier\OAuthResourceGuard\Token\Impersonation;
+use GuillaumeTissier\ResourceGuard\Token\Impersonation;
 use League\Bundle\OAuth2ServerBundle\Event\AccessTokenExtraClaimsResolveEvent;
 use League\Bundle\OAuth2ServerBundle\Event\ScopeResolveEvent;
 use League\Bundle\OAuth2ServerBundle\OAuth2Events;

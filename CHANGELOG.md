@@ -1,8 +1,8 @@
 # Changelog
 
 All notable changes are documented here. The project follows [Semantic Versioning](https://semver.org/);
-one version number covers the server image, `guillaumetissier/oauth-resource-guard` and
-`@guillaumetissier/oauth-dpop-client`.
+one version number covers the server image and `@guillaumetissier/oauth-dpop-client`.
+`guillaumetissier/resource-guard` has its own repository and changelog.
 
 ## [Unreleased]
 
@@ -15,5 +15,4 @@ First public version.
 - TOTP two-factor authentication with backup codes; roll-out modes `optional`, `grace` (with deadline) and `required`.
 - Administrator impersonation (read-only `ROLE_ADMIN`, single full-access `ROLE_SUPER_ADMIN`), RFC 8693 `act` claim, audited sessions.
 - Login lockout, audit log, signed webhooks, import of existing bcrypt/argon2 password hashes.
-- `oauth-resource-guard`: token and DPoP validation for resource servers, Laravel, Symfony and PSR-15 adapters, webhook verification.
 - `oauth-dpop-client`: browser helper for PKCE, DPoP proofs, token refresh and impersonation.

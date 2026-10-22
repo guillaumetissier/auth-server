@@ -11,15 +11,15 @@ declare(strict_types=1);
  * State (PKCE verifier, DPoP key, last tokens) is kept in .oauth-cli/ next to this file's parent.
  */
 
-require __DIR__.'/../packages/resource-guard/vendor/autoload.php';
+require __DIR__.'/../server/vendor/autoload.php';
 
-use GuillaumeTissier\OAuthResourceGuard\Client\DpopProofFactory;
-use GuillaumeTissier\OAuthResourceGuard\Dpop\DpopProofValidator;
-use GuillaumeTissier\OAuthResourceGuard\Dpop\InMemoryReplayStore;
-use GuillaumeTissier\OAuthResourceGuard\Guard\AuthenticationFailed;
-use GuillaumeTissier\OAuthResourceGuard\Guard\ResourceGuard;
-use GuillaumeTissier\OAuthResourceGuard\Token\AccessTokenValidator;
-use GuillaumeTissier\OAuthResourceGuard\Token\StaticJwksProvider;
+use GuillaumeTissier\ResourceGuard\Client\DpopProofFactory;
+use GuillaumeTissier\ResourceGuard\Dpop\DpopProofValidator;
+use GuillaumeTissier\ResourceGuard\Dpop\InMemoryReplayStore;
+use GuillaumeTissier\ResourceGuard\Guard\AuthenticationFailed;
+use GuillaumeTissier\ResourceGuard\Guard\ResourceGuard;
+use GuillaumeTissier\ResourceGuard\Token\AccessTokenValidator;
+use GuillaumeTissier\ResourceGuard\Token\StaticJwksProvider;
 use Jose\Component\Core\JWK;
 use OTPHP\TOTP;
 

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Event;
 
 use App\Entity\User;
-use GuillaumeTissier\OAuthResourceGuard\Webhook\WebhookEvent;
+use GuillaumeTissier\ResourceGuard\Webhook\WebhookEvent;
 
 /**
  * Domain event about an account, dispatched on the Symfony event dispatcher.
