@@ -10,6 +10,10 @@ one version number covers the server image and `@guillaumetissier/oauth-dpop-cli
 - PHPStan at level max with the Symfony and Doctrine extensions (`composer stan`, `make stan`, CI job).
 - End-to-end check over real HTTP (`tools/e2e.php`, `make e2e`), run in CI against the Docker image and MySQL.
 
+### Changed
+- README rewritten as a step-by-step guide (installation, development, production, usage); reference material moved to `docs/`.
+- `make up` returns once the stack is healthy; `make purge` works from cron; `make secrets` makes `.env.docker` readable by its owner only.
+
 ### Fixed
 - Console commands run with `docker compose exec` (`make user`, `make client`...) could not reach MySQL:
   DATABASE_URL was only composed by the start-up script. It is now composed by Symfony from the `MYSQL_*`
