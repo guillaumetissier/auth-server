@@ -1,0 +1,23 @@
+includes:
+    - vendor/phpstan/phpstan-symfony/extension.neon
+    - vendor/phpstan/phpstan-symfony/rules.neon
+    - vendor/phpstan/phpstan-doctrine/extension.neon
+    - vendor/phpstan/phpstan-doctrine/rules.neon
+
+parameters:
+    level: max
+    paths:
+        - src
+        - tests
+        - tools
+        - migrations
+        - public
+        - bin/console
+    excludePaths:
+        - tests/PhpStan
+    tmpDir: var/phpstan
+    symfony:
+        # Dumped by "bin/console cache:warmup --env=dev" (composer stan does it).
+        containerXmlPath: var/cache/dev/App_KernelDevDebugContainer.xml
+    doctrine:
+        objectManagerLoader: tests/PhpStan/object-manager.php

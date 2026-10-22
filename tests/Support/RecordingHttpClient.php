@@ -26,6 +26,9 @@ final class RecordingHttpClient implements HttpClientInterface
         $this->mock = new MockHttpClient(static fn (): MockResponse => new MockResponse('', ['http_code' => 204]));
     }
 
+    /**
+     * @param array<string, mixed> $options
+     */
     public function request(string $method, string $url, array $options = []): ResponseInterface
     {
         self::$requests[] = ['method' => $method, 'url' => $url, 'options' => $options];
@@ -38,6 +41,9 @@ final class RecordingHttpClient implements HttpClientInterface
         return $this->mock->stream($responses, $timeout);
     }
 
+    /**
+     * @param array<string, mixed> $options
+     */
     public function withOptions(array $options): static
     {
         return $this;

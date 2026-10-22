@@ -30,7 +30,6 @@ final readonly class ImportUsersCommand
     private const BATCH_SIZE = 200;
 
     public function __construct(
-        private UserRepository $users,
         private EntityManagerInterface $em,
         private LoggerInterface $auditLogger,
     ) {
@@ -49,6 +48,11 @@ final readonly class ImportUsersCommand
         }
 
         $handle = fopen($file, 'r');
+        if (false === $handle) {
+            $io->error(\sprintf('Cannot open "%s".', $file));
+
+            return Command::FAILURE;
+        }
         $header = fgetcsv($handle, null, $delimiter, '"', '');
         $header = \is_array($header) ? array_map(static fn ($h): string => strtolower(trim((string) $h, " \t\n\r\0\x0B\u{FEFF}")), $header) : [];
         if ([] !== array_diff(self::COLUMNS, $header)) {

@@ -16,8 +16,6 @@ use GuillaumeTissier\ResourceGuard\Token\AccessTokenValidator;
 use GuillaumeTissier\ResourceGuard\Token\Impersonation;
 use GuillaumeTissier\ResourceGuard\Token\StaticJwksProvider;
 use GuillaumeTissier\ResourceGuard\Webhook\WebhookEvent;
-use Symfony\Bundle\FrameworkBundle\Console\Application;
-use Symfony\Component\Console\Tester\CommandTester;
 
 final class ImpersonationTest extends OAuthTestCase
 {
@@ -44,10 +42,10 @@ final class ImpersonationTest extends OAuthTestCase
         $code = $this->codeFromRedirect();
 
         [$status, $tokens] = $this->tokenRequest($this->codeParams($code, $pkce['verifier']), $key);
-        self::assertSame(200, $status, json_encode($tokens));
+        self::assertSame(200, $status, (string) json_encode($tokens));
         self::assertLessThanOrEqual(300, $tokens['expires_in'], 'short-lived access token during an impersonation');
 
-        $claims = self::jwtClaims($tokens['access_token']);
+        $claims = self::jwtClaims(self::stringAt($tokens, 'access_token'));
         self::assertSame('app-1001', $claims['sub'], 'the token is the impersonated user\'s');
         self::assertSame(['sub' => 'app-9001'], $claims['act'], 'the administrator is recorded as the actor');
         self::assertSame(Impersonation::MODE_READ_ONLY, $claims['imp_mode']);
@@ -55,20 +53,20 @@ final class ImpersonationTest extends OAuthTestCase
 
         // Resource server: reads pass, writes are refused whatever the scopes.
         $guard = $this->resourceGuard();
-        $principal = $guard->authenticate('GET', self::API, 'DPoP '.$tokens['access_token'], [$key->create('GET', self::API, $tokens['access_token'])]);
+        $principal = $guard->authenticate('GET', self::API, 'DPoP '.self::stringAt($tokens, 'access_token'), [$key->create('GET', self::API, self::stringAt($tokens, 'access_token'))]);
         self::assertSame('app-1001', $principal->userId);
         self::assertSame('app-9001', $principal->actorId());
         try {
-            $guard->authenticate('POST', self::API, 'DPoP '.$tokens['access_token'], [$key->create('POST', self::API, $tokens['access_token'])]);
+            $guard->authenticate('POST', self::API, 'DPoP '.self::stringAt($tokens, 'access_token'), [$key->create('POST', self::API, self::stringAt($tokens, 'access_token'))]);
             self::fail('Writes must be refused during a read-only impersonation');
         } catch (AuthenticationFailed $e) {
             self::assertSame('impersonation_read_only', $e->errorCode);
         }
 
         $started = $this->webhook(WebhookEvent::IMPERSONATION_STARTED);
-        self::assertSame('app-1001', $started['data']['user_id']);
-        self::assertSame('app-9001', $started['data']['actor_id']);
-        self::assertSame('Support ticket #4711, item list issue', $started['data']['reason']);
+        self::assertSame('app-1001', self::arrayAt($started, 'data')['user_id'] ?? null);
+        self::assertSame('app-9001', self::arrayAt($started, 'data')['actor_id'] ?? null);
+        self::assertSame('Support ticket #4711, item list issue', self::arrayAt($started, 'data')['reason'] ?? null);
     }
 
     public function testSuperAdminHasFullRightsAndMayImpersonateAnAdmin(): void
@@ -83,12 +81,12 @@ final class ImpersonationTest extends OAuthTestCase
         $this->confirm($superSecret);
 
         [, $tokens] = $this->tokenRequest($this->codeParams($this->codeFromRedirect(), $pkce['verifier']), $key);
-        $claims = self::jwtClaims($tokens['access_token']);
+        $claims = self::jwtClaims(self::stringAt($tokens, 'access_token'));
         self::assertSame('app-9001', $claims['sub']);
         self::assertSame(Impersonation::MODE_FULL, $claims['imp_mode']);
-        self::assertContains('items.write', $claims['scopes']);
+        self::assertContains('items.write', self::arrayAt($claims, 'scopes'));
 
-        $principal = $this->resourceGuard()->authenticate('POST', self::API, 'DPoP '.$tokens['access_token'], [$key->create('POST', self::API, $tokens['access_token'])]);
+        $principal = $this->resourceGuard()->authenticate('POST', self::API, 'DPoP '.self::stringAt($tokens, 'access_token'), [$key->create('POST', self::API, self::stringAt($tokens, 'access_token'))]);
         self::assertFalse($principal->isReadOnly());
     }
 
@@ -152,31 +150,31 @@ final class ImpersonationTest extends OAuthTestCase
         [$tokens, $key] = $this->impersonateAs(User::ROLE_ADMIN);
 
         $this->browser->request('POST', '/impersonation/end', server: [
-            'HTTP_AUTHORIZATION' => 'DPoP '.$tokens['access_token'],
-            'HTTP_DPOP' => $key->create('POST', 'http://localhost/impersonation/end', $tokens['access_token']),
+            'HTTP_AUTHORIZATION' => 'DPoP '.self::stringAt($tokens, 'access_token'),
+            'HTTP_DPOP' => $key->create('POST', 'http://localhost/impersonation/end', self::stringAt($tokens, 'access_token')),
         ]);
         self::assertResponseStatusCodeSame(204);
 
-        [$status, $error] = $this->tokenRequest(['grant_type' => 'refresh_token', 'refresh_token' => $tokens['refresh_token']], $key);
+        [$status, $error] = $this->tokenRequest(['grant_type' => 'refresh_token', 'refresh_token' => self::stringAt($tokens, 'refresh_token')], $key);
         self::assertSame(400, $status);
-        self::assertSame('invalid_grant', $error['error']);
+        self::assertSame('invalid_grant', self::stringAt($error, 'error'));
 
         $ended = $this->webhook(WebhookEvent::IMPERSONATION_ENDED);
-        self::assertSame(ImpersonationSession::END_BY_ADMIN, $ended['data']['end_reason']);
+        self::assertSame(ImpersonationSession::END_BY_ADMIN, self::arrayAt($ended, 'data')['end_reason'] ?? null);
     }
 
     public function testRefreshWorksDuringTheSessionButNotAfterItsExpiry(): void
     {
         [$tokens, $key] = $this->impersonateAs(User::ROLE_ADMIN);
 
-        [$status, $refreshed] = $this->tokenRequest(['grant_type' => 'refresh_token', 'refresh_token' => $tokens['refresh_token']], $key);
-        self::assertSame(200, $status, json_encode($refreshed));
-        self::assertSame(['sub' => 'app-9001'], self::jwtClaims($refreshed['access_token'])['act'], 'refreshed tokens keep the actor');
+        [$status, $refreshed] = $this->tokenRequest(['grant_type' => 'refresh_token', 'refresh_token' => self::stringAt($tokens, 'refresh_token')], $key);
+        self::assertSame(200, $status, (string) json_encode($refreshed));
+        self::assertSame(['sub' => 'app-9001'], self::jwtClaims(self::stringAt($refreshed, 'access_token'))['act'], 'refreshed tokens keep the actor');
 
         $this->em()->createQuery('UPDATE '.ImpersonationSession::class.' s SET s.expiresAt = :past')
             ->setParameter('past', new \DateTimeImmutable('-1 minute'))->execute();
 
-        [$status] = $this->tokenRequest(['grant_type' => 'refresh_token', 'refresh_token' => $refreshed['refresh_token']], $key);
+        [$status] = $this->tokenRequest(['grant_type' => 'refresh_token', 'refresh_token' => self::stringAt($refreshed, 'refresh_token')], $key);
         self::assertSame(400, $status);
 
         self::assertSame(1, static::getContainer()->get(ImpersonationManager::class)->closeExpired());
@@ -186,7 +184,7 @@ final class ImpersonationTest extends OAuthTestCase
     {
         $this->createUser('frank', 'app-1', withTotp: false);
         $this->createUser('carla', 'app-9001', withTotp: false);
-        $tester = new CommandTester((new Application(self::$kernel))->find('app:user:role'));
+        $tester = $this->command('app:user:role');
 
         self::assertSame(0, $tester->execute(['username' => 'frank', 'role' => 'ROLE_SUPER_ADMIN']));
         self::assertSame(1, $tester->execute(['username' => 'carla', 'role' => 'ROLE_SUPER_ADMIN']));
@@ -194,9 +192,8 @@ final class ImpersonationTest extends OAuthTestCase
 
         self::assertSame(0, $tester->execute(['username' => 'carla', 'role' => 'ROLE_SUPER_ADMIN', '--transfer' => true]));
         $this->em()->clear();
-        $users = $this->em()->getRepository(User::class);
-        self::assertFalse($users->findOneBy(['username' => 'frank'])->hasRole(User::ROLE_SUPER_ADMIN));
-        self::assertTrue($users->findOneBy(['username' => 'carla'])->hasRole(User::ROLE_SUPER_ADMIN));
+        self::assertFalse($this->userNamed('frank')->hasRole(User::ROLE_SUPER_ADMIN));
+        self::assertTrue($this->userNamed('carla')->hasRole(User::ROLE_SUPER_ADMIN));
     }
 
     // --- helpers ------------------------------------------------------------------------
@@ -243,7 +240,7 @@ final class ImpersonationTest extends OAuthTestCase
     }
 
     /**
-     * @return array{array<string, mixed>, DpopProofFactory}
+     * @return array{array<mixed>, DpopProofFactory}
      */
     private function impersonateAs(string $role): array
     {
@@ -255,11 +252,14 @@ final class ImpersonationTest extends OAuthTestCase
         $this->reachConfirmation('carla', $secret, $pkce['challenge'], 'app-1001');
         $this->confirm($secret);
         [$status, $tokens] = $this->tokenRequest($this->codeParams($this->codeFromRedirect(), $pkce['verifier']), $key);
-        self::assertSame(200, $status, json_encode($tokens));
+        self::assertSame(200, $status, (string) json_encode($tokens));
 
         return [$tokens, $key];
     }
 
+    /**
+     * @return array<string, string>
+     */
     private function codeParams(string $code, string $verifier): array
     {
         return ['grant_type' => 'authorization_code', 'code' => $code, 'redirect_uri' => self::REDIRECT_URI, 'code_verifier' => $verifier];
@@ -286,7 +286,7 @@ final class ImpersonationTest extends OAuthTestCase
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<mixed>
      */
     private function webhook(string $type): array
     {

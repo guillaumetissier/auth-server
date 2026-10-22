@@ -36,14 +36,14 @@ final class AuthorizationCodeFlowTest extends OAuthTestCase
             'code_verifier' => $pkce['verifier'],
         ], $key);
 
-        self::assertSame(200, $status, json_encode($tokens));
-        self::assertSame('DPoP', $tokens['token_type']);
+        self::assertSame(200, $status, (string) json_encode($tokens));
+        self::assertSame('DPoP', self::stringAt($tokens, 'token_type'));
         self::assertArrayHasKey('refresh_token', $tokens);
         self::assertSame('http://spa.test', $this->browser->getResponse()->headers->get('Access-Control-Allow-Origin'));
 
-        $claims = self::jwtClaims($tokens['access_token']);
+        $claims = self::jwtClaims(self::stringAt($tokens, 'access_token'));
         self::assertSame('app-1001', $claims['sub'], 'sub must be the id of the main application');
-        self::assertSame($key->thumbprint(), $claims['cnf']['jkt']);
+        self::assertSame($key->thumbprint(), self::arrayAt($claims, 'cnf')['jkt'] ?? null);
 
         // A resource server verifies the token with the published JWKS + the DPoP proof.
         $this->browser->request('GET', '/.well-known/jwks.json');
@@ -52,14 +52,14 @@ final class AuthorizationCodeFlowTest extends OAuthTestCase
             new DpopProofValidator(new InMemoryReplayStore()),
         );
         $api = 'https://api.test/api/items';
-        $principal = $guard->authenticate('GET', $api, 'DPoP '.$tokens['access_token'], [$key->create('GET', $api, $tokens['access_token'])]);
+        $principal = $guard->authenticate('GET', $api, 'DPoP '.self::stringAt($tokens, 'access_token'), [$key->create('GET', $api, self::stringAt($tokens, 'access_token'))]);
         self::assertSame('app-1001', $principal->userId);
         self::assertTrue($principal->hasScope('profile'));
 
         // The same token is useless to whoever steals it without the private key.
         $thief = DpopProofFactory::withNewKey();
         try {
-            $guard->authenticate('GET', $api, 'DPoP '.$tokens['access_token'], [$thief->create('GET', $api, $tokens['access_token'])]);
+            $guard->authenticate('GET', $api, 'DPoP '.self::stringAt($tokens, 'access_token'), [$thief->create('GET', $api, self::stringAt($tokens, 'access_token'))]);
             self::fail('A stolen DPoP-bound token must be rejected');
         } catch (AuthenticationFailed $e) {
             self::assertSame('invalid_dpop_proof', $e->errorCode);
@@ -78,23 +78,23 @@ final class AuthorizationCodeFlowTest extends OAuthTestCase
         ], $key);
 
         // Another key cannot redeem the refresh token.
-        [$status, $error] = $this->tokenRequest(['grant_type' => 'refresh_token', 'refresh_token' => $tokens['refresh_token']], DpopProofFactory::withNewKey());
+        [$status, $error] = $this->tokenRequest(['grant_type' => 'refresh_token', 'refresh_token' => self::stringAt($tokens, 'refresh_token')], DpopProofFactory::withNewKey());
         self::assertSame(400, $status);
-        self::assertSame('invalid_grant', $error['error']);
+        self::assertSame('invalid_grant', self::stringAt($error, 'error'));
 
         // Neither can a request without proof.
-        [$status, $error] = $this->tokenRequest(['grant_type' => 'refresh_token', 'refresh_token' => $tokens['refresh_token']], null);
+        [$status, $error] = $this->tokenRequest(['grant_type' => 'refresh_token', 'refresh_token' => self::stringAt($tokens, 'refresh_token')], null);
         self::assertSame(400, $status);
-        self::assertSame('invalid_dpop_proof', $error['error']);
+        self::assertSame('invalid_dpop_proof', self::stringAt($error, 'error'));
 
         // The legitimate client can, and gets a new pair bound to the same key.
-        [$status, $refreshed] = $this->tokenRequest(['grant_type' => 'refresh_token', 'refresh_token' => $tokens['refresh_token']], $key);
-        self::assertSame(200, $status, json_encode($refreshed));
-        self::assertSame('DPoP', $refreshed['token_type']);
-        self::assertSame($key->thumbprint(), self::jwtClaims($refreshed['access_token'])['cnf']['jkt']);
+        [$status, $refreshed] = $this->tokenRequest(['grant_type' => 'refresh_token', 'refresh_token' => self::stringAt($tokens, 'refresh_token')], $key);
+        self::assertSame(200, $status, (string) json_encode($refreshed));
+        self::assertSame('DPoP', self::stringAt($refreshed, 'token_type'));
+        self::assertSame($key->thumbprint(), self::arrayAt(self::jwtClaims(self::stringAt($refreshed, 'access_token')), 'cnf')['jkt'] ?? null);
 
         // Rotation: the old refresh token is now revoked.
-        [$status] = $this->tokenRequest(['grant_type' => 'refresh_token', 'refresh_token' => $tokens['refresh_token']], $key);
+        [$status] = $this->tokenRequest(['grant_type' => 'refresh_token', 'refresh_token' => self::stringAt($tokens, 'refresh_token')], $key);
         self::assertSame(400, $status);
     }
 
@@ -110,7 +110,7 @@ final class AuthorizationCodeFlowTest extends OAuthTestCase
         ], DpopProofFactory::withNewKey());
 
         self::assertSame(400, $status);
-        self::assertSame('invalid_grant', $error['error']);
+        self::assertSame('invalid_grant', self::stringAt($error, 'error'));
     }
 
     public function testPkceWithS256IsMandatory(): void
@@ -130,14 +130,14 @@ final class AuthorizationCodeFlowTest extends OAuthTestCase
     {
         [$status, $error] = $this->tokenRequest(['grant_type' => 'authorization_code', 'code' => 'x'], null);
         self::assertSame(400, $status);
-        self::assertSame('invalid_dpop_proof', $error['error']);
+        self::assertSame('invalid_dpop_proof', self::stringAt($error, 'error'));
 
         // A proof for another endpoint is rejected (htu mismatch).
         $this->browser->request('POST', '/token', ['grant_type' => 'authorization_code', 'code' => 'x', 'client_id' => self::CLIENT_ID], server: [
             'HTTP_DPOP' => DpopProofFactory::withNewKey()->create('POST', 'https://elsewhere.test/token'),
         ]);
         self::assertResponseStatusCodeSame(400);
-        self::assertSame('invalid_dpop_proof', json_decode((string) $this->browser->getResponse()->getContent(), true)['error']);
+        self::assertSame('invalid_dpop_proof', $this->responseJson()['error'] ?? null);
     }
 
     public function testCorsPreflightOnTokenEndpoint(): void
@@ -158,32 +158,35 @@ final class AuthorizationCodeFlowTest extends OAuthTestCase
 
         $events = array_column(self::webhooks(), 'type');
         self::assertSame([WebhookEvent::USER_TWO_FACTOR_ENABLED, WebhookEvent::USER_LOGIN_SUCCEEDED], $events);
-        self::assertTrue(self::webhooks()[1]['data']['second_factor']);
+        self::assertTrue(self::arrayAt(self::arrayAt(self::webhooks(), 1), 'data')['second_factor'] ?? null);
 
-        $request = RecordingHttpClient::$requests[array_key_last(RecordingHttpClient::$requests)];
+        $requests = RecordingHttpClient::$requests;
+        $request = end($requests);
+        self::assertIsArray($request);
         self::assertSame('http://webhook.test/receive', $request['url']);
         $signatureHeader = null;
-        foreach ($request['options']['headers'] as $name => $value) {
-            if (0 === strcasecmp($name, WebhookSignature::HEADER)) {
+        foreach (self::arrayAt($request['options'], 'headers') as $name => $value) {
+            if (0 === strcasecmp((string) $name, WebhookSignature::HEADER) && \is_string($value)) {
                 $signatureHeader = $value;
             }
         }
+        $body = self::stringAt($request['options'], 'body');
         $signature = new WebhookSignature('test-webhook-secret-0123456789abcdef');
-        self::assertTrue($signature->verify($request['options']['body'], $signatureHeader));
-        self::assertSame('app-1001', WebhookEvent::fromJson($request['options']['body'])->userId());
+        self::assertTrue($signature->verify($body, $signatureHeader));
+        self::assertSame('app-1001', WebhookEvent::fromJson($body)->userId());
     }
 
     public function testDiscoveryDocuments(): void
     {
         $this->browser->request('GET', '/.well-known/oauth-authorization-server');
         self::assertResponseIsSuccessful();
-        $metadata = json_decode((string) $this->browser->getResponse()->getContent(), true);
-        self::assertSame(['S256'], $metadata['code_challenge_methods_supported']);
-        self::assertContains('ES256', $metadata['dpop_signing_alg_values_supported']);
+        $metadata = $this->responseJson();
+        self::assertSame(['S256'], $metadata['code_challenge_methods_supported'] ?? null);
+        self::assertContains('ES256', self::arrayAt($metadata, 'dpop_signing_alg_values_supported'));
 
         $this->browser->request('GET', '/.well-known/jwks.json');
-        $jwks = json_decode((string) $this->browser->getResponse()->getContent(), true);
-        self::assertSame('RSA', $jwks['keys'][0]['kty']);
-        self::assertArrayNotHasKey('d', $jwks['keys'][0], 'never publish the private key');
+        $key = self::arrayAt(self::arrayAt($this->responseJson(), 'keys'), 0);
+        self::assertSame('RSA', $key['kty'] ?? null);
+        self::assertArrayNotHasKey('d', $key, 'never publish the private key');
     }
 }

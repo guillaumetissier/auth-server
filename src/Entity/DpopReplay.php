@@ -23,7 +23,19 @@ class DpopReplay
     #[ORM\Column(name: 'expires_at')]
     private \DateTimeImmutable $expiresAt;
 
-    private function __construct()
+    public function __construct(string $proofHash, \DateTimeImmutable $expiresAt)
     {
+        $this->proofHash = $proofHash;
+        $this->expiresAt = $expiresAt;
+    }
+
+    public function getProofHash(): string
+    {
+        return $this->proofHash;
+    }
+
+    public function getExpiresAt(): \DateTimeImmutable
+    {
+        return $this->expiresAt;
     }
 }

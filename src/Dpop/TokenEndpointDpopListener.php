@@ -37,7 +37,7 @@ final readonly class TokenEndpointDpopListener
             return;
         }
 
-        $proofs = $request->headers->all('dpop');
+        $proofs = array_values(array_filter($request->headers->all('dpop'), \is_string(...)));
 
         if ([] === $proofs) {
             if ($this->policy->requiresDpop($this->clientId($request))) {

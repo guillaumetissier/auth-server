@@ -32,6 +32,11 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  * }
  *
  * Users are referenced by username ("user") or by their id in the main application ("external_user_id").
+ *
+ * @phpstan-type TypeRow array{code: string, label: string}
+ * @phpstan-type DomainRow array{code: string, name: string, parent: ?string, setsOwner: bool, owner: ?User, ownerRights: ?AccessExpression}
+ * @phpstan-type MemberRow array{user: User, domain: ?string}
+ * @phpstan-type GrantRow array{user: User, domain: string, subdomains: bool, rights: AccessExpression}
  */
 #[AsCommand(name: 'app:access:import', description: 'Imports domains, memberships, owners and rights from a JSON file')]
 final class AccessImportCommand
@@ -60,80 +65,44 @@ final class AccessImportCommand
         }
         $this->errors = [];
 
-        $types = $this->list($data, 'resource_types');
-        $domains = $this->sortByParent($this->list($data, 'domains'));
-        $members = $this->list($data, 'members');
-        $grants = $this->list($data, 'grants');
-
-        // --- Check everything first ---
-        $knownTypes = array_flip(array_map(static fn (ResourceType $t): string => $t->getCode(), $this->em->getRepository(ResourceType::class)->findAll()));
-        foreach ($types as $i => $t) {
-            if (!\is_string($t['code'] ?? null) || 1 !== preg_match(ResourceType::CODE_PATTERN, $t['code'])) {
-                $this->errors[] = \sprintf('resource_types[%d]: invalid code.', $i);
-                continue;
-            }
-            $knownTypes[$t['code']] = true;
+        // --- Read and check everything first: typed rows, or errors.
+        $knownTypes = [];
+        foreach ($this->em->getRepository(ResourceType::class)->findAll() as $type) {
+            $knownTypes[$type->getCode()] = true;
+        }
+        $types = $this->resourceTypes($this->items($data, 'resource_types'));
+        foreach ($types as $type) {
+            $knownTypes[$type['code']] = true;
         }
 
         $paths = [];
         foreach ($this->domains->findAll() as $existing) {
             $paths[$existing->getCode()] = $existing->getPath();
         }
-        foreach ($domains as $i => $d) {
-            $code = $d['code'] ?? null;
-            $parent = $d['parent'] ?? null;
-            if (!\is_string($code) || 1 !== preg_match(Domain::CODE_PATTERN, $code)) {
-                $this->errors[] = \sprintf('domains[%d]: invalid code.', $i);
-                continue;
+        $domains = $this->domainRows($this->sortByParent($this->items($data, 'domains')), $paths, $knownTypes);
+        $members = $this->memberRows($this->items($data, 'members'), $paths);
+
+        $memberPath = static function (User $user) use ($members, $paths): ?string {
+            foreach ($members as $member) {
+                if ($member['user']->getId() === $user->getId()) {
+                    return null === $member['domain'] ? null : $paths[$member['domain']];
+                }
             }
-            if (null !== $parent && !isset($paths[$parent])) {
-                $this->errors[] = \sprintf('domain "%s": unknown parent "%s".', $code, (string) $parent);
-                continue;
-            }
-            $path = (null === $parent ? '/' : $paths[$parent]).$code.'/';
-            if (isset($paths[$code]) && $paths[$code] !== $path) {
-                $this->errors[] = \sprintf('domain "%s" exists at %s, the file puts it at %s: moving domains is not supported.', $code, $paths[$code], $path);
-            }
-            $paths[$code] = $path;
-            if (isset($d['owner_rights'])) {
-                $this->expression($d['owner_rights'], \sprintf('domain "%s" owner_rights', $code), $knownTypes);
+
+            return $user->getDomain()?->getPath();
+        };
+
+        foreach ($domains as $domain) {
+            if (null !== $domain['owner'] && null !== ($path = $memberPath($domain['owner'])) && !str_starts_with($paths[$domain['code']], $path)) {
+                $this->errors[] = \sprintf('domain "%s": owner %s belongs to %s, not to this domain or above.', $domain['code'], $domain['owner']->getUsername(), $path);
             }
         }
 
-        $membership = [];
-        foreach ($members as $i => $m) {
-            $user = $this->user($m, \sprintf('members[%d]', $i));
-            $domain = $m['domain'] ?? null;
-            if (null !== $domain && !isset($paths[$domain])) {
-                $this->errors[] = \sprintf('members[%d]: unknown domain "%s".', $i, (string) $domain);
-            }
-            if (null !== $user) {
-                $membership[$user->getUsername()] = null === $domain ? null : ($paths[$domain] ?? null);
-            }
-        }
-        $memberPath = static fn (User $u): ?string => \array_key_exists($u->getUsername(), $membership) ? $membership[$u->getUsername()] : $u->getDomain()?->getPath();
-
-        foreach ($domains as $d) {
-            if (!\is_string($d['owner'] ?? null) || !isset($paths[$d['code'] ?? ''])) {
-                continue;
-            }
-            $owner = $this->user(['user' => $d['owner']], \sprintf('domain "%s" owner', $d['code']));
-            if (null !== $owner && null !== ($p = $memberPath($owner)) && !str_starts_with($paths[$d['code']], $p)) {
-                $this->errors[] = \sprintf('domain "%s": owner %s belongs to %s, not to this domain or above.', $d['code'], $owner->getUsername(), $p);
-            }
-        }
-
-        foreach ($grants as $i => $g) {
-            $label = \sprintf('grants[%d]', $i);
-            $user = $this->user($g, $label);
-            $domain = $g['domain'] ?? null;
-            if (!\is_string($domain) || !isset($paths[$domain])) {
-                $this->errors[] = \sprintf('%s: unknown domain "%s".', $label, \is_string($domain) ? $domain : '');
-                continue;
-            }
-            $this->expression($g['rights'] ?? null, $label, $knownTypes);
-            if (null !== $user && null !== ($p = $memberPath($user)) && !str_starts_with($paths[$domain], $p)) {
-                $this->errors[] = \sprintf('%s: %s belongs to %s, rights on %s would never apply.', $label, $user->getUsername(), $p, $paths[$domain]);
+        $grants = $this->grantRows($this->items($data, 'grants'), $paths, $knownTypes);
+        foreach ($grants as $i => $grant) {
+            $path = $memberPath($grant['user']);
+            if (null !== $path && !str_starts_with($paths[$grant['domain']], $path)) {
+                $this->errors[] = \sprintf('grants[%d]: %s belongs to %s, rights on %s would never apply.', $i, $grant['user']->getUsername(), $path, $paths[$grant['domain']]);
             }
         }
 
@@ -151,41 +120,43 @@ final class AccessImportCommand
             return Command::SUCCESS;
         }
 
-        // --- Write, in one transaction ---
+        // --- Write, in one transaction.
         $this->em->wrapInTransaction(function () use ($types, $domains, $members, $grants): void {
-            foreach ($types as $t) {
-                $type = $this->em->find(ResourceType::class, $t['code']);
-                null === $type ? $this->em->persist(new ResourceType($t['code'], (string) ($t['label'] ?? $t['code']))) : $type->setLabel((string) ($t['label'] ?? $type->getLabel()));
+            foreach ($types as $type) {
+                $existing = $this->em->find(ResourceType::class, $type['code']);
+                null === $existing ? $this->em->persist(new ResourceType($type['code'], $type['label'])) : $existing->setLabel($type['label']);
             }
             $this->em->flush();
 
-            foreach ($domains as $d) {
-                $domain = $this->domains->findByCode($d['code']);
-                $name = (string) ($d['name'] ?? $d['code']);
+            foreach ($domains as $row) {
+                $domain = $this->domains->findByCode($row['code']);
                 if (null === $domain) {
-                    $this->manager->createDomain($d['code'], $name, null !== ($d['parent'] ?? null) ? $this->domains->findByCode($d['parent']) : null);
+                    $this->manager->createDomain($row['code'], $row['name'], null === $row['parent'] ? null : $this->domain($row['parent']));
                 } else {
-                    $domain->setName($name);
+                    $domain->setName($row['name']);
                 }
             }
             $this->em->flush();
 
-            foreach ($members as $m) {
-                $this->manager->moveUser($this->user($m, ''), null !== ($m['domain'] ?? null) ? $this->domains->findByCode($m['domain']) : null, null);
+            foreach ($members as $member) {
+                $this->manager->moveUser($member['user'], null === $member['domain'] ? null : $this->domain($member['domain']), null);
             }
 
-            foreach ($domains as $d) {
-                if (!\array_key_exists('owner', $d) && !isset($d['owner_rights'])) {
+            foreach ($domains as $row) {
+                if (!$row['setsOwner'] && null === $row['ownerRights']) {
                     continue;
                 }
-                $domain = $this->domains->findByCode($d['code']);
-                $owner = \array_key_exists('owner', $d) ? (null === $d['owner'] ? null : $this->user(['user' => $d['owner']], '')) : $domain->getOwner();
-                $rights = isset($d['owner_rights']) ? AccessExpression::parse($d['owner_rights']) : $domain->getOwnerExpression();
-                $this->manager->setOwner($domain, $owner, $rights, null);
+                $domain = $this->domain($row['code']);
+                $this->manager->setOwner(
+                    $domain,
+                    $row['setsOwner'] ? $row['owner'] : $domain->getOwner(),
+                    $row['ownerRights'] ?? $domain->getOwnerExpression(),
+                    null,
+                );
             }
 
-            foreach ($grants as $g) {
-                $this->manager->grant($this->user($g, ''), $this->domains->findByCode($g['domain']), AccessExpression::parse($g['rights']), (bool) ($g['subdomains'] ?? false), null);
+            foreach ($grants as $grant) {
+                $this->manager->grant($grant['user'], $this->domain($grant['domain']), $grant['rights'], $grant['subdomains'], null);
             }
         });
 
@@ -195,11 +166,127 @@ final class AccessImportCommand
     }
 
     /**
+     * @param list<array<string, mixed>> $items
+     *
+     * @return list<TypeRow>
+     */
+    private function resourceTypes(array $items): array
+    {
+        $rows = [];
+        foreach ($items as $i => $item) {
+            $code = self::str($item, 'code');
+            if (null === $code || 1 !== preg_match(ResourceType::CODE_PATTERN, $code)) {
+                $this->errors[] = \sprintf('resource_types[%d]: invalid code.', $i);
+                continue;
+            }
+            $rows[] = ['code' => $code, 'label' => self::str($item, 'label') ?? $code];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Also completes $paths with the domains of the file.
+     *
+     * @param list<array<string, mixed>> $items
+     * @param array<string, string>      $paths      domain code => path
+     * @param array<string, true>        $knownTypes
+     *
+     * @return list<DomainRow>
+     */
+    private function domainRows(array $items, array &$paths, array $knownTypes): array
+    {
+        $rows = [];
+        foreach ($items as $i => $item) {
+            $code = self::str($item, 'code');
+            $parent = self::str($item, 'parent');
+            if (null === $code || 1 !== preg_match(Domain::CODE_PATTERN, $code)) {
+                $this->errors[] = \sprintf('domains[%d]: invalid code.', $i);
+                continue;
+            }
+            if (null !== $parent && !isset($paths[$parent])) {
+                $this->errors[] = \sprintf('domain "%s": unknown parent "%s".', $code, $parent);
+                continue;
+            }
+            $path = (null === $parent ? '/' : $paths[$parent]).$code.'/';
+            if (isset($paths[$code]) && $paths[$code] !== $path) {
+                $this->errors[] = \sprintf('domain "%s" exists at %s, the file puts it at %s: moving domains is not supported.', $code, $paths[$code], $path);
+            }
+            $paths[$code] = $path;
+
+            $setsOwner = \array_key_exists('owner', $item);
+            $ownerName = self::str($item, 'owner');
+            $rows[] = [
+                'code' => $code,
+                'name' => self::str($item, 'name') ?? $code,
+                'parent' => $parent,
+                'setsOwner' => $setsOwner,
+                'owner' => null === $ownerName ? null : $this->user(['user' => $ownerName], \sprintf('domain "%s" owner', $code)),
+                'ownerRights' => \array_key_exists('owner_rights', $item) ? $this->expression($item['owner_rights'], \sprintf('domain "%s" owner_rights', $code), $knownTypes) : null,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $items
+     * @param array<string, string>      $paths
+     *
+     * @return list<MemberRow>
+     */
+    private function memberRows(array $items, array $paths): array
+    {
+        $rows = [];
+        foreach ($items as $i => $item) {
+            $label = \sprintf('members[%d]', $i);
+            $user = $this->user($item, $label);
+            $domain = self::str($item, 'domain');
+            if (null !== $domain && !isset($paths[$domain])) {
+                $this->errors[] = \sprintf('%s: unknown domain "%s".', $label, $domain);
+                continue;
+            }
+            if (null !== $user) {
+                $rows[] = ['user' => $user, 'domain' => $domain];
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $items
+     * @param array<string, string>      $paths
+     * @param array<string, true>        $knownTypes
+     *
+     * @return array<int, GrantRow> keyed by position in the file
+     */
+    private function grantRows(array $items, array $paths, array $knownTypes): array
+    {
+        $rows = [];
+        foreach ($items as $i => $item) {
+            $label = \sprintf('grants[%d]', $i);
+            $user = $this->user($item, $label);
+            $domain = self::str($item, 'domain');
+            if (null === $domain || !isset($paths[$domain])) {
+                $this->errors[] = \sprintf('%s: unknown domain "%s".', $label, $domain ?? '');
+                continue;
+            }
+            $rights = $this->expression($item['rights'] ?? null, $label, $knownTypes);
+            if (null !== $user && null !== $rights) {
+                $rows[$i] = ['user' => $user, 'domain' => $domain, 'subdomains' => true === ($item['subdomains'] ?? false), 'rights' => $rights];
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
      * @param array<mixed> $data
      *
      * @return list<array<string, mixed>>
      */
-    private function list(array $data, string $key): array
+    private function items(array $data, string $key): array
     {
         $items = $data[$key] ?? [];
         if (!\is_array($items) || !array_is_list($items)) {
@@ -208,13 +295,17 @@ final class AccessImportCommand
             return [];
         }
 
-        return array_values(array_filter($items, function ($item, int $i) use ($key): bool {
-            if (!\is_array($item)) {
+        $objects = [];
+        foreach ($items as $i => $item) {
+            $object = \is_array($item) ? array_filter($item, \is_string(...), \ARRAY_FILTER_USE_KEY) : null;
+            if (null === $object || \count($object) !== \count($item)) {
                 $this->errors[] = \sprintf('%s[%d] must be an object.', $key, $i);
+                continue;
             }
+            $objects[] = $object;
+        }
 
-            return \is_array($item);
-        }, \ARRAY_FILTER_USE_BOTH));
+        return $objects;
     }
 
     /**
@@ -227,8 +318,8 @@ final class AccessImportCommand
     private function sortByParent(array $domains): array
     {
         $byCode = [];
-        foreach ($domains as $d) {
-            $byCode[(string) ($d['code'] ?? '')] = $d;
+        foreach ($domains as $i => $domain) {
+            $byCode[self::str($domain, 'code') ?? '#'.$i] = $domain;
         }
         $sorted = [];
         $visit = function (string $code, array $stack) use (&$visit, &$sorted, $byCode): void {
@@ -240,8 +331,8 @@ final class AccessImportCommand
 
                 return;
             }
-            $parent = $byCode[$code]['parent'] ?? null;
-            if (\is_string($parent)) {
+            $parent = self::str($byCode[$code], 'parent');
+            if (null !== $parent) {
                 $visit($parent, [...$stack, $code]);
             }
             $sorted[$code] = $byCode[$code];
@@ -258,13 +349,15 @@ final class AccessImportCommand
      */
     private function user(array $ref, string $label): ?User
     {
+        $username = self::str($ref, 'user');
+        $externalId = $ref['external_user_id'] ?? null;
         $user = match (true) {
-            \is_string($ref['user'] ?? null) => $this->users->findOneByUsername($ref['user']),
-            \is_scalar($ref['external_user_id'] ?? null) => $this->users->findOneBy(['externalUserId' => (string) $ref['external_user_id']]),
+            null !== $username => $this->users->findOneByUsername($username),
+            \is_string($externalId) || \is_int($externalId) => $this->users->findOneBy(['externalUserId' => (string) $externalId]),
             default => null,
         };
-        if (null === $user && '' !== $label) {
-            $this->errors[] = \sprintf('%s: unknown user "%s".', $label, (string) ($ref['user'] ?? $ref['external_user_id'] ?? ''));
+        if (null === $user) {
+            $this->errors[] = \sprintf('%s: unknown user "%s".', $label, $username ?? (\is_scalar($externalId) ? (string) $externalId : ''));
         }
 
         return $user;
@@ -273,24 +366,44 @@ final class AccessImportCommand
     /**
      * @param array<string, true> $knownTypes
      */
-    private function expression(mixed $value, string $label, array $knownTypes): void
+    private function expression(mixed $value, string $label, array $knownTypes): ?AccessExpression
     {
         if (!\is_string($value)) {
             $this->errors[] = \sprintf('%s: rights must be a string.', $label);
 
-            return;
+            return null;
         }
         try {
             $expression = AccessExpression::parse($value);
         } catch (InvalidAccessExpression $e) {
             $this->errors[] = \sprintf('%s: %s', $label, $e->getMessage());
 
-            return;
+            return null;
         }
         foreach ($expression->namedTypes() as $type) {
             if (!isset($knownTypes[$type]) && !\array_key_exists($type, ResourceType::RESERVED)) {
                 $this->errors[] = \sprintf('%s: unknown resource type "%s".', $label, $type);
             }
         }
+
+        return $expression;
+    }
+
+    /**
+     * A domain checked during the validation phase: it exists (or has just been created).
+     */
+    private function domain(string $code): Domain
+    {
+        return $this->domains->findByCode($code) ?? throw new \LogicException(\sprintf('Domain "%s" vanished during the import.', $code));
+    }
+
+    /**
+     * @param array<string, mixed> $item
+     */
+    private static function str(array $item, string $key): ?string
+    {
+        $value = $item[$key] ?? null;
+
+        return \is_string($value) && '' !== $value ? $value : null;
     }
 }

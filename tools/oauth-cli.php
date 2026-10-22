@@ -41,6 +41,9 @@ final class OAuthCli
         $this->redirectUri = getenv('REDIRECT_URI') ?: 'http://localhost:5173/callback';
     }
 
+    /**
+     * @param list<string> $argv
+     */
     public function run(array $argv): int
     {
         $command = $argv[1] ?? 'help';
@@ -50,13 +53,17 @@ final class OAuthCli
             'authorize-url' => $this->authorizeUrl($args),
             'new-key' => $this->out($this->newKey($args[0] ?? 'default')),
             'thumbprint' => $this->out($this->dpop($args[0] ?? 'default')->thumbprint()),
-            'proof' => $this->out($this->dpop($args[3] ?? 'default')->create($args[0], $args[1], $args[2] ?? null)),
+            'proof' => $this->out($this->dpop($args[3] ?? 'default')->create(
+                $args[0] ?? throw new InvalidArgumentException('usage: proof METHOD URL [ACCESS_TOKEN] [KEY]'),
+                $args[1] ?? throw new InvalidArgumentException('usage: proof METHOD URL [ACCESS_TOKEN] [KEY]'),
+                $args[2] ?? null,
+            )),
             'token' => $this->token($args),
             'refresh' => $this->refresh($args),
             'decode' => $this->decode($args[0] ?? $this->lastToken('access_token')),
             'call' => $this->call($args),
             'end-impersonation' => $this->endImpersonation($args),
-            'totp' => $this->out(TOTP::createFromSecret(str_replace(' ', '', $args[0]))->now()),
+            'totp' => $this->out($this->totp($args[0] ?? '')),
             default => $this->help(),
         };
     }
@@ -89,6 +96,9 @@ final class OAuthCli
         return 0;
     }
 
+    /**
+     * @param list<string> $args
+     */
     private function authorizeUrl(array $args): int
     {
         $verifier = rtrim(strtr(base64_encode(random_bytes(48)), '+/', '-_'), '=');
@@ -128,43 +138,56 @@ final class OAuthCli
         return $factory->thumbprint();
     }
 
+    /**
+     * @param list<string> $args
+     */
     private function token(array $args): int
     {
-        $opts = $this->options($args);
-        $code = $opts['_'][0] ?? throw new InvalidArgumentException('usage: token CODE');
-        $pkce = $this->load('pkce.json');
+        [$positional, $flags] = $this->options($args);
+        $code = $positional[0] ?? throw new InvalidArgumentException('usage: token CODE');
+        $verifier = self::flag($flags, 'verifier') ?? $this->load('pkce.json')['verifier'] ?? null;
+        if (!is_string($verifier)) {
+            throw new RuntimeException("No PKCE verifier stored: run 'authorize-url' first");
+        }
 
         return $this->tokenRequest([
             'grant_type' => 'authorization_code',
             'code' => $code,
             'redirect_uri' => $this->redirectUri,
-            'code_verifier' => $opts['verifier'] ?? $pkce['verifier'],
-        ], $opts);
+            'code_verifier' => $verifier,
+        ], $flags);
     }
 
+    /**
+     * @param list<string> $args
+     */
     private function refresh(array $args): int
     {
-        $opts = $this->options($args);
+        [, $flags] = $this->options($args);
 
         return $this->tokenRequest([
             'grant_type' => 'refresh_token',
-            'refresh_token' => $opts['token'] ?? $this->lastToken('refresh_token'),
-        ], $opts);
+            'refresh_token' => self::flag($flags, 'token') ?? $this->lastToken('refresh_token'),
+        ], $flags);
     }
 
-    private function tokenRequest(array $params, array $opts): int
+    /**
+     * @param array<string, string>      $params
+     * @param array<string, string|true> $flags
+     */
+    private function tokenRequest(array $params, array $flags): int
     {
         $url = $this->issuer.'/token';
         $headers = ['Content-Type: application/x-www-form-urlencoded'];
-        if (!isset($opts['no-dpop'])) {
-            $headers[] = 'DPoP: '.$this->dpop($opts['key'] ?? 'default')->create('POST', $url);
+        if (!isset($flags['no-dpop'])) {
+            $headers[] = 'DPoP: '.$this->dpop(self::flag($flags, 'key') ?? 'default')->create('POST', $url);
         }
 
         [$status, $body] = $this->http('POST', $url, $headers, http_build_query($params + ['client_id' => $this->clientId]));
         echo "HTTP {$status}\n{$body}\n";
 
         $json = json_decode($body, true);
-        if (200 === $status && isset($json['access_token'])) {
+        if (200 === $status && is_array($json) && isset($json['access_token'])) {
             $this->save('tokens.json', $json);
         }
 
@@ -180,11 +203,14 @@ final class OAuthCli
         return 0;
     }
 
+    /**
+     * @param list<string> $args
+     */
     private function call(array $args): int
     {
-        $opts = $this->options($args);
-        $url = $opts['_'][0] ?? 'https://api.localhost/items';
-        $token = $opts['token'] ?? $this->lastToken('access_token');
+        [$positional, $flags] = $this->options($args);
+        $url = $positional[0] ?? 'https://api.localhost/items';
+        $token = self::flag($flags, 'token') ?? $this->lastToken('access_token');
 
         [$status, $jwks] = $this->http('GET', $this->issuer.'/.well-known/jwks.json');
         if (200 !== $status) {
@@ -196,15 +222,15 @@ final class OAuthCli
         $guard = new ResourceGuard(
             new AccessTokenValidator(StaticJwksProvider::fromJwksJson($jwks), [$this->clientId]),
             new DpopProofValidator(new InMemoryReplayStore()),
-            requireDpop: !isset($opts['bearer']),
+            requireDpop: !isset($flags['bearer']),
         );
 
-        $method = strtoupper($opts['method'] ?? 'GET');
+        $method = strtoupper(self::flag($flags, 'method') ?? 'GET');
         try {
-            if (isset($opts['bearer'])) {
+            if (isset($flags['bearer'])) {
                 $principal = $guard->authenticate($method, $url, 'Bearer '.$token);
             } else {
-                $proof = $this->dpop($opts['key'] ?? 'default')->create($method, $url, $token);
+                $proof = $this->dpop(self::flag($flags, 'key') ?? 'default')->create($method, $url, $token);
                 $principal = $guard->authenticate($method, $url, 'DPoP '.$token, [$proof]);
             }
         } catch (AuthenticationFailed $e) {
@@ -220,14 +246,17 @@ final class OAuthCli
         return 0;
     }
 
+    /**
+     * @param list<string> $args
+     */
     private function endImpersonation(array $args): int
     {
-        $opts = $this->options($args);
+        [, $flags] = $this->options($args);
         $url = $this->issuer.'/impersonation/end';
         $token = $this->lastToken('access_token');
         [$status, $body] = $this->http('POST', $url, [
             'Authorization: DPoP '.$token,
-            'DPoP: '.$this->dpop($opts['key'] ?? 'default')->create('POST', $url, $token),
+            'DPoP: '.$this->dpop(self::flag($flags, 'key') ?? 'default')->create('POST', $url, $token),
         ]);
         echo "HTTP {$status}\n{$body}\n";
 
@@ -246,17 +275,31 @@ final class OAuthCli
 
     private function lastToken(string $field): string
     {
-        return $this->load('tokens.json')[$field] ?? throw new RuntimeException("No {$field} stored: run 'token' first");
+        $value = $this->load('tokens.json')[$field] ?? null;
+
+        return is_string($value) ? $value : throw new RuntimeException("No {$field} stored: run 'token' first");
+    }
+
+    private function totp(string $secret): string
+    {
+        $secret = str_replace(' ', '', $secret);
+        if ('' === $secret) {
+            throw new InvalidArgumentException('usage: totp SECRET');
+        }
+
+        return TOTP::createFromSecret($secret)->now();
     }
 
     /**
+     * @param list<string> $headers
+     *
      * @return array{0: int, 1: string}
      */
     private function http(string $method, string $url, array $headers = [], ?string $body = null): array
     {
         $ch = curl_init($url);
         curl_setopt_array($ch, [
-            \CURLOPT_CUSTOMREQUEST => $method,
+            \CURLOPT_CUSTOMREQUEST => $method ?: 'GET',
             \CURLOPT_RETURNTRANSFER => true,
             \CURLOPT_HTTPHEADER => $headers,
             \CURLOPT_TIMEOUT => 10,
@@ -272,34 +315,57 @@ final class OAuthCli
         return [(int) curl_getinfo($ch, \CURLINFO_RESPONSE_CODE), (string) $response];
     }
 
+    /**
+     * @param list<string> $args
+     *
+     * @return array{list<string>, array<string, string|true>} positional arguments, --flags
+     */
     private function options(array $args): array
     {
-        $opts = ['_' => []];
+        $positional = [];
+        $flags = [];
         foreach ($args as $arg) {
-            if (preg_match('/^--([a-z-]+)(?:=(.*))?$/', $arg, $m)) {
-                $opts[$m[1]] = $m[2] ?? true;
+            if (1 === preg_match('/^--([a-z-]+)(?:=(.*))?$/', $arg, $m)) {
+                $flags[$m[1]] = $m[2] ?? true;
             } else {
-                $opts['_'][] = $arg;
+                $positional[] = $arg;
             }
         }
 
-        return $opts;
+        return [$positional, $flags];
     }
 
+    /**
+     * @param array<string, string|true> $flags
+     */
+    private static function flag(array $flags, string $name): ?string
+    {
+        $value = $flags[$name] ?? null;
+
+        return is_string($value) ? $value : null;
+    }
+
+    /**
+     * @param array<mixed> $data
+     */
     private function save(string $file, array $data): void
     {
         file_put_contents($this->stateDir.'/'.$file, json_encode($data, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES));
         chmod($this->stateDir.'/'.$file, 0600);
     }
 
+    /**
+     * @return array<mixed>
+     */
     private function load(string $file): array
     {
         $path = $this->stateDir.'/'.$file;
         if (!is_file($path)) {
             throw new RuntimeException("Missing {$path}");
         }
+        $data = json_decode((string) file_get_contents($path), true);
 
-        return json_decode((string) file_get_contents($path), true);
+        return is_array($data) ? $data : throw new RuntimeException("{$path} is not valid JSON");
     }
 
     private function out(string $line): int

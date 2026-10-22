@@ -16,7 +16,8 @@ if ($_SERVER['APP_DEBUG']) {
     Debug::enable();
 }
 
-if ($trustedProxies = $_SERVER['TRUSTED_PROXIES'] ?? false) {
+$trustedProxies = $_SERVER['TRUSTED_PROXIES'] ?? '';
+if (is_string($trustedProxies) && '' !== $trustedProxies) {
     // Needed behind a reverse proxy so that the scheme/host used for the DPoP "htu" check is the public one.
     Request::setTrustedProxies(
         explode(',', $trustedProxies),
@@ -24,7 +25,7 @@ if ($trustedProxies = $_SERVER['TRUSTED_PROXIES'] ?? false) {
     );
 }
 
-$kernel = new Kernel($_SERVER['APP_ENV'], (bool) $_SERVER['APP_DEBUG']);
+$kernel = new Kernel(is_string($_SERVER['APP_ENV'] ?? null) ? $_SERVER['APP_ENV'] : 'prod', (bool) ($_SERVER['APP_DEBUG'] ?? false));
 $request = Request::createFromGlobals();
 $response = $kernel->handle($request);
 $response->send();

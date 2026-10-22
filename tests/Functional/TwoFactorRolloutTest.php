@@ -7,8 +7,6 @@ namespace App\Tests\Functional;
 use App\Entity\User;
 use App\TwoFactor\TwoFactorPolicy;
 use GuillaumeTissier\ResourceGuard\Webhook\WebhookEvent;
-use Symfony\Bundle\FrameworkBundle\Console\Application;
-use Symfony\Component\Console\Tester\CommandTester;
 
 /**
  * Roll-out of 2FA to existing accounts: grace period with a configurable deadline, optional mode,
@@ -117,7 +115,7 @@ final class TwoFactorRolloutTest extends OAuthTestCase
             '',
         ]));
 
-        $tester = new CommandTester((new Application(self::$kernel))->find('app:user:import'));
+        $tester = $this->command('app:user:import');
         $tester->execute(['file' => $csv]);
         self::assertStringContainsString('2 account(s) created, 1 skipped (already present), 1 invalid', $tester->getDisplay());
 
@@ -139,7 +137,7 @@ final class TwoFactorRolloutTest extends OAuthTestCase
         $this->createUser('alice', 'app-1001');
         $this->createUser('bob', 'app-1002', withTotp: false);
 
-        $tester = new CommandTester((new Application(self::$kernel))->find('app:2fa:status'));
+        $tester = $this->command('app:2fa:status');
         $tester->execute(['--pending' => true]);
         $display = $tester->getDisplay();
 
@@ -153,7 +151,7 @@ final class TwoFactorRolloutTest extends OAuthTestCase
     {
         foreach (['APP_2FA_MODE' => $mode, 'APP_2FA_DEADLINE' => $deadline] as $name => $value) {
             if (!\array_key_exists($name, $this->savedEnv)) {
-                $this->savedEnv[$name] = $_ENV[$name] ?? null;
+                $this->savedEnv[$name] = \is_string($_ENV[$name] ?? null) ? $_ENV[$name] : null;
             }
             $_ENV[$name] = $_SERVER[$name] = $value;
         }
@@ -176,6 +174,6 @@ final class TwoFactorRolloutTest extends OAuthTestCase
     {
         $this->em()->clear();
 
-        return $this->em()->getRepository(User::class)->findOneBy(['username' => 'alice']);
+        return $this->userNamed('alice');
     }
 }
