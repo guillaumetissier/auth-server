@@ -21,6 +21,8 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
+ * Shows or changes the domain and the rights of a user.
+ *
  *   app:access alice                          rights of alice, and what they give on her domain
  *   app:access alice --domain=a10             idem, previewed on a10
  *   app:access alice --move=a10               moves alice to domain a10

@@ -51,7 +51,7 @@ class Domain
     #[ORM\Column]
     private \DateTimeImmutable $createdAt;
 
-    public function __construct(string $code, string $name, ?Domain $parent = null)
+    public function __construct(string $code, string $name, ?self $parent = null)
     {
         if (1 !== preg_match(self::CODE_PATTERN, $code)) {
             throw new \InvalidArgumentException(\sprintf('Invalid domain code "%s" (lowercase letters, digits, "-" and "_").', $code));
@@ -83,7 +83,7 @@ class Domain
         $this->name = $name;
     }
 
-    public function getParent(): ?Domain
+    public function getParent(): ?self
     {
         return $this->parent;
     }
@@ -101,7 +101,7 @@ class Domain
     /**
      * True when this domain is $ancestor or one of its descendants.
      */
-    public function isWithin(Domain $ancestor): bool
+    public function isWithin(self $ancestor): bool
     {
         return DomainPath::isWithin($this->path, $ancestor->getPath());
     }

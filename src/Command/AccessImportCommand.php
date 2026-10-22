@@ -111,7 +111,7 @@ final class AccessImportCommand
                 $membership[$user->getUsername()] = null === $domain ? null : ($paths[$domain] ?? null);
             }
         }
-        $memberPath = fn (User $u): ?string => \array_key_exists($u->getUsername(), $membership) ? $membership[$u->getUsername()] : $u->getDomain()?->getPath();
+        $memberPath = static fn (User $u): ?string => \array_key_exists($u->getUsername(), $membership) ? $membership[$u->getUsername()] : $u->getDomain()?->getPath();
 
         foreach ($domains as $d) {
             if (!\is_string($d['owner'] ?? null) || !isset($paths[$d['code'] ?? ''])) {

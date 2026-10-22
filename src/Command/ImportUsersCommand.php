@@ -51,7 +51,7 @@ final readonly class ImportUsersCommand
         $handle = fopen($file, 'r');
         $header = fgetcsv($handle, null, $delimiter, '"', '');
         $header = \is_array($header) ? array_map(static fn ($h): string => strtolower(trim((string) $h, " \t\n\r\0\x0B\u{FEFF}")), $header) : [];
-        if (array_diff(self::COLUMNS, $header) !== []) {
+        if ([] !== array_diff(self::COLUMNS, $header)) {
             $io->error(\sprintf('The first line must name the columns: %s.', implode(',', self::COLUMNS)));
 
             return Command::FAILURE;

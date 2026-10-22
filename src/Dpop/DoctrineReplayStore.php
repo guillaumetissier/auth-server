@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Dpop;
 
-use GuillaumeTissier\ResourceGuard\Dpop\ReplayStoreInterface;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\DBAL\Types\Types;
+use GuillaumeTissier\ResourceGuard\Dpop\ReplayStoreInterface;
 
 /**
  * MySQL-backed DPoP replay store: the primary key makes "insert if absent" atomic, so two
