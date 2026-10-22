@@ -1,85 +1,492 @@
 # Auth Server
 
-A standalone OAuth 2 authorization server for first-party applications:
-**Authorization Code + PKCE**, **TOTP two-factor authentication**, **DPoP**-bound tokens (RFC 9449),
-and audited **impersonation** for support staff.
+A sign-in server for your own applications. Users sign in **once, here** (password + code from an
+authenticator app), and your applications receive a **token** proving who the user is. Your
+applications never see passwords.
 
-It stores credentials only. The `sub` claim of every token is the user's id in *your* application's
-database (`external_user_id`), so your application keeps owning its users, roles and data.
+It is a standard OAuth 2 authorization server (Authorization Code + PKCE), with TOTP two-factor
+authentication, DPoP-bound tokens (RFC 9449), audited impersonation for support staff, and optional
+domains and rights.
 
-```
- Browser (SPA)                          Auth Server (Docker)                    Your API (resource server)
- ─────────────                          ────────────────────                    ──────────────────────────
- 1. /authorize?code_challenge=… ─────▶  login (Twig) → TOTP → code
- 2. POST /token + DPoP proof ────────▶  checks PKCE + DPoP proof
-    ◀──── access_token (JWT, cnf.jkt) + refresh_token (bound to the same key)
- 3. GET /api/… Authorization: DPoP … + DPoP proof ─────────────────────────▶  resource-guard: signature (JWKS),
-                                                                               expiry, DPoP proof, ath, jkt
-                                        signed account events (webhooks) ──▶  your listeners
-```
+**Contents**
 
-## Contents
+1. [Words used in this guide](#1-words-used-in-this-guide)
+2. [What you need to install](#2-what-you-need-to-install)
+3. [Start it on your computer (development)](#3-start-it-on-your-computer-development)
+4. [Everyday commands and troubleshooting](#4-everyday-commands-and-troubleshooting)
+5. [Production deployment](#5-production-deployment)
+6. [Using the application](#6-using-the-application)
+7. [Development without Docker](#7-development-without-docker)
+8. [Reference documentation](#8-reference-documentation)
 
-| Path | What it is |
+---
+
+## 1. Words used in this guide
+
+| Word | Meaning |
 |---|---|
-| `src/`, `config/`, `templates/`, `migrations/`, `tests/` | The authorization server, a Symfony 7.4 application (league/oauth2-server-bundle, scheb/2fa, Twig login pages) |
-| `docker/`, `Dockerfile` | Image: FrankenPHP, PHP settings, start-up script |
-| `.env` / `.env.docker.example` | Symfony defaults (committed, no secrets) / Docker Compose settings, copied to `.env.docker` with its secrets by `make secrets` |
-| `packages/dpop-client-ts/` | [`@guillaumetissier/oauth-dpop-client`](https://www.npmjs.com/package/@guillaumetissier/oauth-dpop-client): dependency-free TypeScript helper for browser applications: PKCE, DPoP proofs (WebCrypto), token exchange and refresh. See its [README](packages/dpop-client-ts/README.md) |
-| `tools/` | `oauth-cli.php` (plays the browser client and a resource server from the command line) and `webhook-receiver.php`, for manual testing |
-| `docker-compose.yml` | `auth-server` (FrankenPHP) and `auth-db` (MySQL 8.4) on a private network |
+| **Auth server** | This project. It shows the sign-in pages and issues tokens. |
+| **Application** (or **client**) | A website or app of yours that lets users sign in through the auth server. Each one is registered once with an identifier (`client_id`), e.g. `my-spa`. |
+| **User** | A person who signs in. Each user has a **username**, a **password** and an **external id**. |
+| **External id** | The id of the user in *your* application's database (e.g. `42`). The auth server puts it in the token (claim `sub`), so your application knows which of its users signed in. While trying things out, any number works. |
+| **Token** | A signed piece of text the application receives after sign-in and sends with each request to its API. The **access token** lives 15 minutes; the **refresh token** gets a new one without signing in again. |
+| **2FA / TOTP** | Two-factor authentication: after the password, a 6-digit code from an authenticator app on a phone (Google Authenticator, Microsoft Authenticator, FreeOTP, 1Password, …). The code changes every 30 seconds. |
+| **DPoP** | Protection that makes a stolen token useless: each request also carries a proof signed by a key that never leaves the application. |
+| **Issuer** | The public address of the auth server, e.g. `http://localhost:8080` on your computer or `https://auth.example.com` in production. |
+| **Docker** | A tool that runs the auth server and its database in isolated "containers", so you do not need to install PHP or MySQL yourself. |
+| **Terminal** | The window where you type commands (Terminal on macOS and Linux, Ubuntu/WSL on Windows). Every command of this guide is typed there and confirmed with Enter. |
 
-## Installation
+---
 
-| Part | Install |
-|---|---|
-| Server | Docker image `ghcr.io/guillaumetissier/auth-server` (tags `1`, `1.0`, `1.0.0`), or build it from this repository |
-| API protection (PHP) | `composer require guillaumetissier/resource-guard` |
-| Browser client | `npm install @guillaumetissier/oauth-dpop-client` |
+## 2. What you need to install
 
-To run the published image instead of building it, replace `build:` by
-`image: ghcr.io/guillaumetissier/auth-server:1` in `docker-compose.yml`.
+You need **Git**, **Docker** (with **Docker Compose v2**), **make** and **openssl**. PHP is **not**
+needed to run the server.
 
-## Setup (development)
-
-### With Docker (recommended)
-
-Requirements: Docker with Compose, `make`, `openssl`. PHP 8.3+ and Composer on the host only for the
-command-line test tool and the test suites.
+### Linux (Ubuntu or Debian)
 
 ```bash
-make secrets       # creates .env.docker with random secrets (APP_SECRET, MySQL passwords, encryption keys)
-make up            # builds and starts; first start generates the RSA signing keys and runs the migrations
-
-curl http://localhost:8080/health                      # {"status":"ok"}
-curl http://localhost:8080/.well-known/oauth-authorization-server
+sudo apt update
+sudo apt install -y git make openssl curl
+curl -fsSL https://get.docker.com | sudo sh        # installs Docker and Docker Compose
+sudo usermod -aG docker $USER                      # lets you use Docker without sudo
 ```
 
-Register a client and a first user. `EXTERNAL_ID` is the id of that user in your application; any
-value works while developing.
+**Log out and log in again** (or restart) so that the last command takes effect.
+
+### macOS
+
+1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and start it (whale icon in the menu bar).
+2. In a terminal, install Git and make: `xcode-select --install`. openssl is already there.
+
+### Windows
+
+1. Install WSL 2 with Ubuntu: open PowerShell **as administrator**, run `wsl --install`, restart, then
+   open "Ubuntu" from the Start menu and choose a Linux username and password.
+2. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/), and in its settings enable
+   *Resources → WSL integration → Ubuntu*.
+3. In the Ubuntu window: `sudo apt update && sudo apt install -y git make openssl`.
+
+Type every command of this guide in the **Ubuntu** window, not in PowerShell.
+
+### Check
+
+```bash
+git --version              # git version 2.x
+docker compose version     # Docker Compose version v2.x   (not "docker-compose", with a dash)
+docker run --rm hello-world   # prints "Hello from Docker!"
+make --version             # GNU Make 3.x or 4.x
+```
+
+If one of them fails, see [Troubleshooting](#troubleshooting).
+
+### Optional: PHP, to try tokens from the command line
+
+Only needed for step 3.9 (seeing a token) and for the tests. On Ubuntu 24.04 or Debian 13:
+
+```bash
+sudo apt install -y php8.3-cli php8.3-mysql php8.3-sqlite3 php8.3-intl php8.3-curl \
+                    php8.3-mbstring php8.3-xml php8.3-gmp unzip composer
+php --version              # PHP 8.3.x
+```
+
+(Older Ubuntu versions ship an older PHP: add `ppa:ondrej/php` first. macOS: `brew install php composer`.)
+
+---
+
+## 3. Start it on your computer (development)
+
+### 3.1 Download the project
+
+```bash
+git clone https://github.com/guillaumetissier/auth-server.git
+cd auth-server
+```
+
+All the following commands are run **from this `auth-server` folder**.
+
+### 3.2 Create the settings file
+
+```bash
+make secrets
+```
+
+Expected output: `Secrets written to .env.docker (ignored by git).`
+
+This creates the file `.env.docker` with random passwords and keys. Keep it: if you delete it after
+the first start, the database will refuse the new passwords (see [Troubleshooting](#troubleshooting)).
+The defaults are right for your computer; nothing to edit now.
+
+### 3.3 Start the server
+
+```bash
+make up
+```
+
+The first time, this downloads and builds everything: **allow 3 to 10 minutes**. The command returns
+when the server is ready and ends with lines such as:
+
+```
+ ✔ Container auth-server-auth-db-1      Healthy
+ ✔ Container auth-server-auth-server-1  Healthy
+```
+
+At its first start the server creates its signing keys and its database tables by itself.
+
+### 3.4 Check that it answers
+
+```bash
+curl http://localhost:8080/health
+```
+
+Expected: `{"status":"ok"}`. You can also open <http://localhost:8080/health> in your browser.
+
+### 3.5 Register an application
+
+The auth server only accepts sign-ins coming from registered applications. Register a test one:
 
 ```bash
 make client ID=my-spa REDIRECT=http://localhost:5173/callback
-make user USERNAME=alice EXTERNAL_ID=42                # prompts for the password (12 characters min.)
-make role USERNAME=alice ROLE=ROLE_ADMIN               # optional: lets alice impersonate users
 ```
 
-Try the whole flow without writing a client, with the command-line tool:
+- `my-spa` is the identifier of the application.
+- `http://localhost:5173/callback` is where the browser is sent back after sign-in. Nothing needs to
+  run there for this test.
+
+### 3.6 Create a user
 
 ```bash
-composer install                             # the tools use the server's dependencies
-php tools/oauth-cli.php authorize-url        # open the printed URL, log in, set up 2FA (or click "Later")
-# the browser ends on http://localhost:5173/callback?code=…  (nothing listens there: copy the code)
-php tools/oauth-cli.php token <CODE>         # exchanges it with a DPoP proof
-php tools/oauth-cli.php decode               # shows the access token claims
-php tools/oauth-cli.php call                 # verifies it as a resource server would
+make user USERNAME=alice EXTERNAL_ID=42
 ```
 
-Importing existing users is optional (see [Migrating existing users](#migrating-existing-users)).
+You are asked for a password (at least 12 characters). Nothing is displayed while you type: this is
+normal. Expected: `[OK] User "alice" created (sub = 42).`
 
-### Without Docker (PHP + SQLite)
+### 3.7 Sign in
 
-Requirements: PHP 8.3+ with `pdo_sqlite`, `sodium`, `intl`, and Composer.
+1. Open <http://localhost:8080/login> in your browser.
+2. Enter `alice` and her password, click **Continue**.
+3. You arrive on the **account page**, showing `alice`. From there you can set up two-factor
+   authentication (next step) and sign out.
+
+### 3.8 Set up two-factor authentication
+
+1. On the account page, click **Set up two-factor authentication**.
+2. On your phone, open your authenticator app, choose "add an account", and scan the QR code shown on
+   the page (or type the secret displayed under it, without the spaces).
+3. Type the 6-digit code shown by the app and click **Activate**.
+4. The page then shows **10 backup codes**. Each one replaces a phone code once, if you lose the phone.
+   Write them down, then click **I have saved them, continue**.
+
+From now on, signing in as alice asks for the password **and** a code from the app.
+
+> When users sign in through an application, the server asks them to set up 2FA by itself. With the
+> default setting (`APP_2FA_MODE=grace`), they can click **Later**. See
+> [Migrating existing users](docs/migrating-users.md) to change this.
+
+### 3.9 See the token an application receives (optional, needs PHP)
+
+This step plays the role of an application from the command line, to see the whole sign-in flow.
+It needs PHP (see [Optional: PHP](#optional-php-to-try-tokens-from-the-command-line)).
+
+1. Install the PHP libraries used by the tool (once, takes a minute):
+
+   ```bash
+   composer install
+   ```
+
+2. Print a sign-in address:
+
+   ```bash
+   php tools/oauth-cli.php authorize-url
+   ```
+
+3. Copy the long address it prints (starting with `http://localhost:8080/authorize?`) into your
+   browser. Sign in if asked (password, then the code of your app).
+4. The browser ends on an address starting with `http://localhost:5173/callback?code=` and shows
+   "This site can't be reached". **This is expected**: no application listens there. Copy the value
+   after `code=` up to `&state` (excluded) from the address bar.
+5. Within **5 minutes** (the code expires), exchange it for tokens:
+
+   ```bash
+   php tools/oauth-cli.php token PASTE_THE_CODE_HERE
+   ```
+
+6. Look at what the token contains, then check it as an API would:
+
+   ```bash
+   php tools/oauth-cli.php decode     # "sub": "42" is alice's external id
+   php tools/oauth-cli.php call       # 200 OK user=42 client=my-spa scopes=… proof_of_possession=yes
+   ```
+
+`php tools/oauth-cli.php refresh` gets new tokens with the refresh token. `php tools/oauth-cli.php help`
+lists everything.
+
+### 3.10 Become an administrator
+
+Administrators manage users and rights in the browser, and can impersonate users.
+
+```bash
+make role USERNAME=alice ROLE=ROLE_SUPER_ADMIN
+```
+
+Sign out and in again: the account page now has a **Users and rights** button, which opens the
+administration pages (<http://localhost:8080/admin>). See [Using the application](#6-using-the-application).
+
+You now have a working auth server. To connect a real application, go to
+[For developers](#for-developers-connecting-an-application).
+
+---
+
+## 4. Everyday commands and troubleshooting
+
+Run these from the `auth-server` folder.
+
+| To… | Type |
+|---|---|
+| Stop the server (data is kept) | `make down` |
+| Start it again | `make up` |
+| See what the server writes (errors, requests); Ctrl+C to stop watching | `make logs` |
+| See if it runs | `docker compose ps` |
+| Apply a change made in `.env.docker` | `docker compose up -d` |
+| List every `make` command | `make help` |
+| **Delete everything** (users, clients, keys) and start from zero | `docker compose down -v`, then `make up` |
+
+### Troubleshooting
+
+| Message or symptom | Cause and fix |
+|---|---|
+| `make: command not found` | Install make (see [section 2](#2-what-you-need-to-install)). |
+| `permission denied while trying to connect to the Docker daemon socket` | Run `sudo usermod -aG docker $USER`, then log out and in again. |
+| `Cannot connect to the Docker daemon` | Docker is not started: start Docker Desktop (macOS, Windows), or `sudo systemctl start docker` (Linux). |
+| `docker: 'compose' is not a docker command` | Docker Compose v2 is missing: reinstall Docker as in section 2. The old `docker-compose` is not supported. |
+| `env file .env.docker not found` | Run `make secrets` first. |
+| `Bind for 0.0.0.0:8080 failed: port is already allocated` | Another program uses port 8080. Use another port: set `APP_ISSUER=http://localhost:8081` in `.env.docker`, then start with `AUTH_SERVER_PORT=8081 make up`. Use `http://localhost:8081` everywhere in this guide, and prefix the tool commands with `ISSUER=http://localhost:8081`. |
+| `container auth-server-auth-db-1 is unhealthy`, or `Access denied for user 'auth'` in `make logs` | The database was created with other passwords (usually `.env.docker` was deleted and recreated). If you have no data to keep: `docker compose down -v`, then `make up`. |
+| `the input device is not a TTY` | You ran a `make` command from a script or cron: use `make purge` (made for it) or `docker compose exec -T auth-server php bin/console …`. |
+| "Invalid credentials" on the login page | Wrong username or password. After 5 failures from the same computer, wait 15 minutes; after 10 failures in total, the account is locked for 30 minutes. |
+| The 6-digit code is refused | Check the time of the phone and of the computer (automatic time on both). Each code works once. |
+| `token` answers `invalid_grant` | The code is older than 5 minutes or was already used: start again from `authorize-url`. |
+| `composer install` complains about a missing `ext-…` | Install the matching PHP package, e.g. `ext-pdo_mysql` → `php8.3-mysql`, `ext-pdo_sqlite` → `php8.3-sqlite3`. |
+| Anything else | `make logs` shows the error. |
+
+---
+
+## 5. Production deployment
+
+This section installs the auth server on an Internet-facing Linux server, at an address such as
+`https://auth.example.com`. Replace `auth.example.com` and `app.example.com` by your own names.
+
+### What you need
+
+- A Linux server (Ubuntu 24.04 or Debian 12, 1 GB of RAM or more) you can reach with `ssh`.
+- A domain name, and access to its DNS settings.
+- Ports 80 and 443 open towards the server (TLS certificates are obtained on port 80).
+
+### 5.1 Point the name to the server
+
+At your DNS provider, create an **A record** `auth.example.com` → the IP address of the server. Check
+from your computer, after a few minutes: `ping auth.example.com` shows the server's IP.
+
+### 5.2 Install the tools on the server
+
+Connect with `ssh`, then install Git, make, openssl and Docker exactly as in
+[section 2, Linux](#linux-ubuntu-or-debian), and log out and in again.
+
+### 5.3 Download the project and create the settings
+
+```bash
+cd ~
+git clone https://github.com/guillaumetissier/auth-server.git
+cd auth-server
+make secrets
+```
+
+Open the settings file with a text editor (`nano .env.docker`; in nano, Ctrl+O then Enter saves,
+Ctrl+X quits) and change these lines:
+
+```dotenv
+APP_ISSUER=https://auth.example.com
+TRUSTED_PROXIES=PRIVATE_SUBNETS
+CORS_ALLOWED_ORIGINS=https://app.example.com
+TOTP_ISSUER="Example Inc."
+```
+
+- `APP_ISSUER`: the public address, with `https://` and **without** a trailing slash.
+- `TRUSTED_PROXIES=PRIVATE_SUBNETS`: tells the server that requests come through the HTTPS proxy of step 5.5.
+- `CORS_ALLOWED_ORIGINS`: the addresses of your browser applications, comma-separated.
+- `TOTP_ISSUER`: the name users will see in their authenticator app.
+
+Optionally, choose the 2FA policy (`APP_2FA_MODE`) and webhooks (`WEBHOOK_URLS`): see
+[Configuration](docs/configuration.md).
+
+**Back up `.env.docker`** somewhere safe (a password manager): without it, the two-factor secrets
+stored in the database cannot be read.
+
+### 5.4 Keep the server port private
+
+The server must only be reached through HTTPS. Publish its port on the server itself only:
+
+```bash
+echo 'export AUTH_SERVER_PORT=127.0.0.1:8080' >> ~/.bashrc
+source ~/.bashrc
+```
+
+(Docker publishes ports around the firewall, so this setting matters even with a firewall.)
+
+### 5.5 Start the server
+
+```bash
+make up
+docker compose ps        # the PORTS column shows 127.0.0.1:8080->8080/tcp
+curl http://127.0.0.1:8080/health     # {"status":"ok"}
+```
+
+The containers restart by themselves after a reboot.
+
+### 5.6 Add HTTPS with Caddy
+
+Caddy is a web server that obtains and renews TLS certificates automatically.
+
+```bash
+sudo apt install -y caddy
+sudo nano /etc/caddy/Caddyfile
+```
+
+Replace the content of the file by:
+
+```
+auth.example.com {
+    reverse_proxy 127.0.0.1:8080
+}
+```
+
+Then:
+
+```bash
+sudo systemctl reload caddy
+```
+
+Check from your computer: <https://auth.example.com/health> shows `{"status":"ok"}` with a padlock.
+If not: `sudo journalctl -u caddy --since "10 minutes ago"` shows why (usually the DNS record or a
+closed port 80).
+
+(Any other reverse proxy works, e.g. nginx with certbot: forward to `127.0.0.1:8080` and set the
+`X-Forwarded-For`, `X-Forwarded-Proto` and `X-Forwarded-Host` headers.)
+
+### 5.7 Create the first accounts
+
+```bash
+make user USERNAME=admin EXTERNAL_ID=1
+make role USERNAME=admin ROLE=ROLE_SUPER_ADMIN
+make client ID=my-app REDIRECT=https://app.example.com/callback
+```
+
+Sign in at `https://auth.example.com/login` and set up two-factor authentication at once (step 3.8):
+administrators need it. To bring existing users with their current passwords, see
+[Migrating existing users](docs/migrating-users.md).
+
+### 5.8 Schedule the clean-up
+
+Expired tokens must be removed regularly. Open the scheduled tasks of your user with `crontab -e`
+(choose nano if asked) and add this line:
+
+```
+0 * * * * cd $HOME/auth-server && make purge >> $HOME/auth-server-purge.log 2>&1
+```
+
+### 5.9 Back up
+
+Back up the database every day and keep `.env.docker` with the backups: see
+[Operations](docs/operations.md#data-and-backups) for the commands.
+
+### 5.10 Upgrade
+
+```bash
+cd ~/auth-server
+git pull
+make up
+```
+
+Database changes are applied automatically when the server starts. Read `CHANGELOG.md` before upgrading.
+
+### 5.11 Monitor
+
+Have a monitoring service call `https://auth.example.com/health` every minute: it answers
+`{"status":"ok"}` (HTTP 200) when the server works.
+
+---
+
+## 6. Using the application
+
+### For users
+
+| Page | Address | What for |
+|---|---|---|
+| Sign in | `/login` | Username, password, then the 6-digit code (or one backup code). Users usually arrive here through an application. |
+| Account | `/account` | Set up or (when allowed) disable two-factor authentication, generate new backup codes, sign out. |
+
+- **New phone**: sign in with a backup code, then on the account page disable and set up 2FA again
+  (if disabling is not allowed, ask an administrator).
+- **Lost phone and backup codes**: there is no recovery page yet; keep the backup codes in a safe place.
+- **Too many failed attempts**: wait 15 minutes; after 10 failures the account is locked for 30 minutes.
+
+### For administrators
+
+Users with a platform role, or with management rights on a domain, see a **Users and rights** button on
+their account page. It opens `/admin`:
+
+- **Users**: list and search; each user's page shows his domain, rights and roles, and lets you change
+  them (super-administrator, or domain managers within their own rights).
+- **Domains**: the tree of organisations, their members and owners.
+- **Resource types**: the kinds of objects rights apply to (vehicles, invoices, …).
+- **Impersonate in …** button: act as a user in an application, after giving a reason and a fresh 2FA code.
+  It appears once the application's entry point is declared, see [Impersonation](docs/impersonation.md).
+
+Roles:
+
+| Role | Can |
+|---|---|
+| `ROLE_SUPER_ADMIN` | Everything. **One** account only. |
+| `ROLE_ADMIN` | See everything, change nothing, impersonate in read-only mode. |
+
+```bash
+make role USERNAME=carla ROLE=ROLE_ADMIN                   # grant
+make role USERNAME=carla ROLE=ROLE_ADMIN FLAG=--remove     # remove
+make role USERNAME=dave ROLE=ROLE_SUPER_ADMIN FLAG=--transfer   # hand the super-administrator role over
+```
+
+Other administration commands (creating users, importing, 2FA roll-out follow-up, impersonation audit)
+are listed in [Operations](docs/operations.md). Domains and rights are explained in
+[Domains and rights](docs/domains-and-rights.md), impersonation in [Impersonation](docs/impersonation.md).
+
+### For developers: connecting an application
+
+1. Register the application: `make client ID=my-app REDIRECT=https://app.example.com/callback`, and add
+   its origin to `CORS_ALLOWED_ORIGINS`.
+2. In the browser part, sign users in and call your API with the npm package
+   [`@guillaumetissier/oauth-dpop-client`](packages/dpop-client-ts/README.md).
+3. In your PHP API (Laravel, Symfony or any PSR-15 framework), check the tokens with
+   [`guillaumetissier/resource-guard`](https://github.com/guillaumetissier/resource-guard).
+
+The complete walkthrough, with code, is in [Connecting an application](docs/integrating.md).
+
+Addresses an application uses (also listed at `/.well-known/oauth-authorization-server`):
+
+| Address | Purpose |
+|---|---|
+| `/authorize` | Sign-in page (Authorization Code + PKCE S256) |
+| `/token` | Exchanges the code, refreshes tokens (DPoP proof required by default) |
+| `/.well-known/jwks.json` | Public key to verify the tokens |
+| `/impersonation/end` | Ends an impersonation |
+| `/health` | Health check |
+
+---
+
+## 7. Development without Docker
+
+For working on the server's code with PHP only, using an SQLite file as database. Needs the PHP
+packages of [section 2](#optional-php-to-try-tokens-from-the-command-line).
 
 ```bash
 composer install
@@ -91,7 +498,7 @@ OAUTH_ENCRYPTION_KEY=change-me-dev-only-0123456789abcdef0123456789abcdef
 TOTP_ENCRYPTION_KEY=ZGV2ZGV2ZGV2ZGV2ZGV2ZGV2ZGV2ZGV2ZGV2ZGV2ZGU=
 EOF
 php bin/console app:keys:generate --if-missing
-php bin/console doctrine:schema:create          # the migrations target MySQL; SQLite uses the mapping directly
+php bin/console doctrine:schema:create
 php bin/console league:oauth2-server:create-client "My SPA" my-spa --public \
     --redirect-uri=http://localhost:5173/callback \
     --grant-type=authorization_code --grant-type=refresh_token --scope=profile --scope=offline_access
@@ -99,287 +506,26 @@ php bin/console app:user:create alice 42
 php -S 127.0.0.1:8080 -t public public/index.php
 ```
 
-The dev keys above are for local use only: production values come from `make secrets` or your secret store.
+The last command keeps running (Ctrl+C stops it); the server is at <http://localhost:8080>, and steps
+3.7 to 3.9 work the same. Replace `make <command>` by the matching `php bin/console` command
+(`make help` shows them in the `Makefile`). The keys above are for your computer only.
 
-### Tests
+Tests, coding standard, static analysis and project layout: see [Development](docs/development.md).
 
-```bash
-make test        # needs PHP 8.3+ and Composer
-make cs          # checks the coding standard (PHP-CS-Fixer, Symfony rules), changes nothing
-make fixcs       # fixes it
-make stan        # static analysis (PHPStan, level max, Symfony and Doctrine extensions)
-make e2e         # end-to-end check of the running stack (after make up)
-```
+---
 
-`make e2e` (`tools/e2e.php`) drives the running server over real HTTP, as a browser and a client would:
-login with CSRF, 2FA enrollment then TOTP, authorization code with PKCE, DPoP-bound tokens checked by
-resource-guard, domain rights in the token, refresh-token rotation and key binding, CORS, read-only
-impersonation and its end, and the attacks that must fail. It creates its own client and users, so it
-can run again on the same database. The CI runs it against the Docker image and MySQL, which also
-checks the image build, the start-up script and the migrations.
+## 8. Reference documentation
 
-The server has 40 functional tests on SQLite covering the complete flow (login, TOTP,
-PKCE, DPoP-bound tokens, key-bound refresh), 2FA roll-out, import, lockout, CORS, impersonation, domains,
-rights, delegation bounds and the administration pages.
-
-## Configuration
-
-All settings are environment variables: `.env.docker` with Docker Compose (`make secrets` creates it), `.env.local`
-without Docker. `.env` only holds the defaults.
-
-| Variable | Default | Meaning |
-|---|---|---|
-| `APP_ISSUER` | `http://localhost:8080` | Public URL of the server, as browsers reach it. Used in metadata and in the DPoP `htu` check |
-| `TRUSTED_PROXIES` | empty | Reverse proxy addresses when TLS is terminated in front of the container |
-| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | Browser origins allowed to call `/token` and `/impersonation/end` |
-| `APP_2FA_MODE` | `grace` | `optional`, `grace` or `required` (see below). Administrators always need 2FA |
-| `APP_2FA_DEADLINE` | empty | In `grace` mode, date from which 2FA becomes required (e.g. `2026-12-31`). Empty: not decided yet |
-| `TOTP_ISSUER` | `Auth Server` | Name shown in authenticator apps |
-| `DPOP_REQUIRED_BY_DEFAULT` | `1` | Clients must present DPoP proofs. Per-client override: `make client-policy` |
-| `OAUTH_ACCESS_TOKEN_TTL` / `OAUTH_REFRESH_TOKEN_TTL` | `PT15M` / `P30D` | Token lifetimes (ISO 8601 durations) |
-| `IMPERSONATION_TTL` | `PT30M` | Maximum length of an impersonation session |
-| `IMPERSONATION_ACCESS_TOKEN_TTL` | `PT5M` | Access token lifetime during an impersonation |
-| `IMPERSONATION_READONLY_SCOPES` | `profile,offline_access` | Scopes kept in read-only impersonations |
-| `ACCESS_DEFAULT_EXPRESSION` | empty | Rights every user holds on his own domain, e.g. `user:w:own` (see [Domains and rights](#domains-and-rights)) |
-| `WEBHOOK_URLS` / `WEBHOOK_SECRET` | empty | Endpoints receiving signed account events, and the shared HMAC secret (32+ characters) |
-| `APP_SECRET`, `MYSQL_*`, `OAUTH_ENCRYPTION_KEY`, `TOTP_ENCRYPTION_KEY` | generated | Secrets, filled by `make secrets` |
-
-## Migrating existing users
-
-**Import** accounts with their current password hashes: nobody has to choose a new password.
-
-```bash
-# from your application, e.g.: SELECT username, id AS external_user_id, password AS password_hash FROM users
-make import FILE=users.csv FLAG=--dry-run    # validates and reports, writes nothing
-make import FILE=users.csv
-```
-
-The CSV needs a header row `username,external_user_id,password_hash`. Only bcrypt (`$2y$…`, e.g. Laravel)
-and Argon2 hashes are accepted, never a clear-text password. The import is idempotent: rows whose
-username or id already exist are skipped. bcrypt hashes are rehashed to Argon2id at the first successful login.
-
-**Roll out 2FA** with `APP_2FA_MODE`:
-
-| Mode | User without 2FA | Can disable 2FA |
-|---|---|---|
-| `optional` | Never asked; can enable it from `/account` | Yes, with a valid code |
-| `grace` (default) | Enrollment page at every login, with a **Later** button valid for the session. From `APP_2FA_DEADLINE` on, no button: 2FA is required | No |
-| `required` | Must enroll at the next login | No |
-
-Leave `APP_2FA_DEADLINE` empty until the date is decided; the page then says 2FA will "soon" be required.
-Once set (and the container restarted with `docker compose up -d`), it shows the date and the days left.
-Follow the roll-out with `make 2fa-status` (`FLAG=--pending` lists the remaining accounts, how often they
-postponed and their last login).
-
-## Security model
-
-- **PKCE with S256 for every client**, public and confidential; `plain` is refused.
-- **DPoP**: the proof is checked at `/token` (type, asymmetric algorithm, signature, `htm`, `htu`, `iat`
-  window, `jti` replay protection stored atomically). The access token carries `cnf.jkt` and the
-  response says `token_type: DPoP`. The refresh token is **bound to the same key**: a stolen refresh token
-  is useless without the client's private key.
-- **Passwords**: Argon2id. The salt is part of each hash, hence no salt column.
-- **TOTP**: secrets encrypted at rest (libsodium, `TOTP_ENCRYPTION_KEY`), enabled only after a valid code,
-  codes cannot be replayed, 10 hashed single-use backup codes.
-- **Brute force**: throttling per IP and username (5 attempts per 15 minutes), and account lock after
-  10 failures (password or second factor) whatever the IP. Unknown user and wrong password get the same message.
-- **Login pages**: CSRF tokens, `X-Frame-Options: DENY`, CSP `frame-ancestors 'none'`, `Cache-Control: no-store`.
-- Rotating refresh tokens, 15-minute access tokens; `password`, `implicit` and `client_credentials` grants disabled.
-- Every account event is written to the `security_audit` log channel.
-
-## Protecting an API (resource server)
-
-Install [`guillaumetissier/resource-guard`](https://github.com/guillaumetissier/resource-guard) in the
-application serving the API (`composer require guillaumetissier/resource-guard`). It validates tokens offline with
-the server's JWKS and checks DPoP proofs. Laravel in short:
-
-```php
-Route::middleware('auth.oauth')->get('/api/items', ...);                     // any valid token
-Route::middleware('auth.oauth:items.write')->post('/api/items', ...);        // scope required
-Route::middleware('auth.oauth:no-impersonation')->post('/api/password', ...); // never while impersonated
-```
-
-Setup for Laravel, Symfony and PSR-15, the `Principal` API and webhook handling are described in the
-[resource-guard README](https://github.com/guillaumetissier/resource-guard#readme).
-
-To reach the server from another Compose project, join its network:
-
-```yaml
-services:
-  app:
-    networks: [default, auth-server]
-networks:
-  auth-server:
-    external: true
-```
-
-## Browser client
-
-```ts
-import { generateDpopKeyPair, buildAuthorizeUrl, exchangeCode, dpopFetch } from '@guillaumetissier/oauth-dpop-client';
-
-const config = { issuer: 'http://localhost:8080', clientId: 'my-spa', redirectUri: 'http://localhost:5173/callback' };
-const keyPair = await generateDpopKeyPair();      // non-extractable; keep it in IndexedDB
-const { url, verifier, state } = await buildAuthorizeUrl(config);
-// redirect to url; then on /callback, after checking state:
-const tokens = await exchangeCode(config, keyPair, code, verifier);
-const response = await dpopFetch(keyPair, tokens, '/api/items');
-```
-
-## Impersonation
-
-Support staff can act on behalf of a user, with a reason, a fresh TOTP code and a time limit.
-
-| Role | Holders | Mode | May impersonate |
-|---|---|---|---|
-| `ROLE_ADMIN` | any number | **Read-only**: scopes reduced to `IMPERSONATION_READONLY_SCOPES`, and resource-guard refuses every non-GET request (403 `impersonation_read_only`) | Regular users |
-| `ROLE_SUPER_ADMIN` | **one** account (enforced by `make role`; `FLAG=--transfer` moves it) | **Full rights** of the user | Regular users and admins |
-| Domain users with `@impersonate` | as granted | `@impersonate:r` read-only, `@impersonate:w` full | Users of the domains where they hold it, never platform staff nor the owner of their own domain or of a domain above |
-
-Nobody impersonates the super-administrator or themselves. Domain owners do not impersonate by default:
-add `@impersonate:r` (or `:w`) to the owner rights of their domain.
-
-The administration pages show an **Impersonate** button on each user the viewer may impersonate. It
-opens the client application's entry point (`make client-policy ID=my-spa FLAG='--impersonation-uri=https://app.example.com/impersonate?user={user}'`),
-which starts the flow below: only the application holds its PKCE verifier and DPoP key.
-
-1. The browser client starts a normal authorization with `impersonate=<external user id>`:
-   `buildAuthorizeUrl(config, { impersonate: '43' })`.
-2. The server shows a confirmation page: reason (10 to 500 characters) and a TOTP code never used before.
-3. The tokens are the user's (`sub` = 43) and carry `act.sub` (the administrator, RFC 8693), `imp`
-   (session id) and `imp_mode`. Access tokens live 5 minutes; refresh tokens die with the session.
-4. "Back to my account": `endImpersonation(config, keyPair, tokens)` calls `POST /impersonation/end`.
-
-Audit with `make impersonations` and the `impersonation.started` / `impersonation.ended` webhooks.
-Resource servers should record `$principal->actorId()` in their own audit trail.
-
-## Domains and rights
-
-Optional: without domains, everything above works unchanged.
-
-**Domains** form a tree (`a1 > a10 > a100`). A user belongs to at most one domain and never gets any
-access above it or beside it: a user of `a10` may reach `a100` and `a101` if granted, never `a1` or the
-sibling `a11`. Platform staff (`ROLE_ADMIN`) usually belong to no domain.
-
-**Rights** are access expressions, held on a domain and optionally all its subdomains:
-
-```
-*:w  tire:r  invoice:-  user:r  user:w:own  @access:w
-```
-
-| Element | Meaning |
+| Document | Content |
 |---|---|
-| `-` `r` `w` `m` | none, read, write, manage (`AccessLevel` enum); each level includes the lower ones |
-| `*` | every resource type; a named type beats `*`, whatever the order (`*:w tire:r` caps tires at read) |
-| `:own` | only resources owned by the user (`user:r user:w:own`: reads every profile, edits his own) |
-| `@access` `@domain` `@impersonate` | reserved system powers, never covered by `*`: manage users' rights, manage subdomains, impersonate |
-
-Resource types are declared once (`make resource-type`, or the administration pages): an expression
-naming an unknown type is refused.
-
-A user's effective rights are, by domain, the highest level among: his grants, the **owner rights** of
-the domains he owns (default `*:m @access:w @domain:w`, set per domain), and `ACCESS_DEFAULT_EXPRESSION`
-on his own domain. They travel in the access token, and resource servers check them offline:
-
-```json
-"dom": "/a1/a10/",
-"acl": [["/a1/a10/", true, "*:r vehicle:w"], ["/a1/a10/", true, "user:w:own"]]
-```
-
-```php
-$principal->can('vehicle', AccessLevel::Write, $vehicle->domainPath);              // GuillaumeTissier\ResourceGuard\Access\AccessLevel
-$principal->can('user', AccessLevel::Write, $profile->domainPath, ownerId: $profile->userId);
-```
-
-Changes take effect in the user's next access token (at most `OAUTH_ACCESS_TOKEN_TTL`) and are announced
-by the `user.access_changed` webhook.
-
-**Administration** (`/admin`, linked from the account page):
-
-| Who | Sees | Changes |
-|---|---|---|
-| `ROLE_SUPER_ADMIN` | everything | everything, including who is platform administrator |
-| `ROLE_ADMIN` | everything | nothing |
-| Holder of `@access:r` / `@access:w` on a domain | its users and their rights | their rights and membership, **never beyond his own rights**, never his own rights nor those of the owner of his domain |
-| Holder of `@domain:w` on a domain | its subdomains | creates subdomains, sets their owner and owner rights (within his own rights) |
-
-Each user page has a preview of the effective level per resource type, as resource servers will compute it.
-
-**Import** from another system once, then manage here:
-
-```bash
-make access-import FILE=access.json FLAG=--dry-run    # checks everything, writes nothing
-make access-import FILE=access.json
-```
-
-```json
-{
-  "resource_types": [{"code": "vehicle", "label": "Vehicles"}],
-  "domains":  [{"code": "a1", "name": "Group", "parent": null},
-               {"code": "a10", "name": "Region 10", "parent": "a1", "owner": "alice", "owner_rights": "*:m @access:w @domain:w"}],
-  "members":  [{"user": "alice", "domain": "a10"}, {"external_user_id": "43", "domain": "a10"}],
-  "grants":   [{"user": "bob", "domain": "a10", "subdomains": true, "rights": "*:r vehicle:w"}]
-}
-```
-
-Users must exist first (`make import`). The file is checked completely, then written in one transaction;
-existing entries are updated, nothing is deleted. Command line: `make domain`, `make access USERNAME=bob`.
-
-## Webhooks
-
-Account events are POSTed as JSON to `WEBHOOK_URLS`, signed with HMAC-SHA256 over a timestamp and the
-body (`X-Auth-Server-Signature: t=…,v1=…`), after the response is sent. resource-guard verifies them and
-de-duplicates redeliveries.
-
-`user.created`, `user.login_succeeded`, `user.login_failed`, `user.locked`, `user.two_factor_enabled`,
-`user.two_factor_disabled`, `user.two_factor_postponed`, `user.roles_changed`, `user.access_changed`, `impersonation.started`,
-`impersonation.ended`.
-
-Inside the server, the extension point is the Symfony event `App\Event\AccountEvent`.
-
-## Operations
-
-| Command | Purpose |
-|---|---|
-| `make purge` | Removes expired tokens and DPoP replay entries, closes expired impersonations. Schedule it hourly |
-| `make 2fa-status` | 2FA roll-out progress |
-| `make impersonations` | Impersonation audit; `FLAG=--end=<id>` ends a session |
-| `make role` / `make client-policy` | Platform roles; per-client DPoP policy and impersonation entry point |
-| `make domain` / `make access` / `make resource-type` | Domain tree and owners, a user's domain and rights, resource types |
-
-- The RSA signing keys live in the `auth-keys` volume. Resource servers fetch the public key from `/.well-known/jwks.json`.
-- Running several server replicas needs shared PHP sessions (`PdoSessionHandler` or Redis).
-- The DPoP replay store is MySQL; a Redis implementation of `ReplayStoreInterface` (`SET key NX EX ttl`) is a one-line swap in `config/services.yaml`.
-
-## Roadmap
-
-- Server-issued DPoP nonces (RFC 9449 §8) and `dpop_jkt` at `/authorize` (§10).
-- Webhook retries through Symfony Messenger.
-- Password change and reset pages; consent screen for third-party clients.
-- Translations of the login pages (English only today).
-
-## Releasing
-
-The server image and the npm package share one version number. Update `CHANGELOG.md`, then tag:
-
-```bash
-git tag v1.0.0 && git push origin v1.0.0
-```
-
-GitHub Actions (`release.yml`) then pushes the image to GitHub Container Registry and publishes the npm
-package (needs the `NPM_TOKEN` secret). `guillaumetissier/resource-guard` lives in its own repository
-and has its own versions.
-
-### Working on resource-guard and the server together
-
-Clone both repositories side by side and point the server at the local copy (do not commit this):
-
-```bash
-composer config repositories.resource-guard '{"type": "path", "url": "../resource-guard"}'
-composer require guillaumetissier/resource-guard:@dev
-```
-
-`git checkout composer.json composer.lock && composer install` goes back to the published version.
+| [Configuration](docs/configuration.md) | Every setting of `.env.docker` |
+| [Migrating existing users](docs/migrating-users.md) | Importing accounts with their passwords, rolling out 2FA |
+| [Connecting an application](docs/integrating.md) | Browser part, API part, webhooks |
+| [Domains and rights](docs/domains-and-rights.md) | Organisations, access expressions, administration, import |
+| [Impersonation](docs/impersonation.md) | Who may act as whom, and how |
+| [Security model](docs/security.md) | What protects users and tokens |
+| [Operations](docs/operations.md) | Commands, backups, scaling |
+| [Development](docs/development.md) | Tests, project layout, releasing, roadmap |
 
 ## License
 

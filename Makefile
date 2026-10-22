@@ -1,5 +1,7 @@
 COMPOSE  = docker compose
 CONSOLE  = $(COMPOSE) exec auth-server php bin/console
+# Without a terminal (cron jobs, scripts).
+CONSOLE_BATCH = $(COMPOSE) exec -T auth-server php bin/console
 
 .PHONY: help secrets up down logs user import 2fa-status role impersonations client client-policy resource-type domain access access-import purge test cs fixcs stan e2e
 
@@ -13,10 +15,11 @@ secrets: ## Create .env.docker from .env.docker.example and fill its empty secre
 	done
 	@grep -q '^TOTP_ENCRYPTION_KEY=$$' .env.docker && sed -i.bak "s|^TOTP_ENCRYPTION_KEY=$$|TOTP_ENCRYPTION_KEY=$$(openssl rand -base64 32)|" .env.docker || true
 	@rm -f .env.docker.bak
+	@chmod 600 .env.docker
 	@echo "Secrets written to .env.docker (ignored by git)."
 
-up: ## Build and start the stack
-	$(COMPOSE) up -d --build
+up: ## Build and start the stack, return when it is ready
+	$(COMPOSE) up -d --build --wait
 
 down: ## Stop the stack
 	$(COMPOSE) down
@@ -64,8 +67,8 @@ access-import: ## Import domains and rights: make access-import FILE=access.json
 		$(COMPOSE) exec auth-server rm -f /tmp/access-import.json; exit $$status
 
 purge: ## Remove expired tokens and DPoP replay entries (schedule it, e.g. hourly)
-	$(CONSOLE) league:oauth2-server:clear-expired-tokens
-	$(CONSOLE) app:purge
+	$(CONSOLE_BATCH) league:oauth2-server:clear-expired-tokens
+	$(CONSOLE_BATCH) app:purge
 
 test: ## Run the server test suite locally (needs PHP 8.3+ and composer)
 	composer install -q && vendor/bin/phpunit
