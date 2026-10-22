@@ -97,6 +97,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TotpTwo
 
     public function __construct(string $username, string $externalUserId)
     {
+        if ('' === $username || '' === $externalUserId) {
+            throw new \InvalidArgumentException('The username and the external user id cannot be empty.');
+        }
         $this->username = $username;
         $this->externalUserId = $externalUserId;
         $this->createdAt = new \DateTimeImmutable();
@@ -119,14 +122,20 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TotpTwo
         return $this->username;
     }
 
+    /**
+     * @return non-empty-string
+     */
     public function getUserIdentifier(): string
     {
-        return $this->username;
+        return '' !== $this->username ? $this->username : throw new \LogicException('User without username.');
     }
 
+    /**
+     * @return non-empty-string
+     */
     public function getExternalUserId(): string
     {
-        return $this->externalUserId;
+        return '' !== $this->externalUserId ? $this->externalUserId : throw new \LogicException('User without external user id.');
     }
 
     public function getRoles(): array

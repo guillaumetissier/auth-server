@@ -21,8 +21,6 @@ use GuillaumeTissier\ResourceGuard\Token\Impersonation;
 use GuillaumeTissier\ResourceGuard\Token\StaticJwksProvider;
 use GuillaumeTissier\ResourceGuard\Webhook\WebhookEvent;
 use League\Bundle\OAuth2ServerBundle\Model\Client;
-use Symfony\Bundle\FrameworkBundle\Console\Application;
-use Symfony\Component\Console\Tester\CommandTester;
 
 /**
  * Domain tree: a1 > a10 > (a100, a101) and a1 > a11.
@@ -67,11 +65,11 @@ final class DomainAccessTest extends OAuthTestCase
     public function testTokenCarriesTheDomainAndTheRights(): void
     {
         [$tokens, $key] = $this->tokensFor('bob');
-        $claims = self::jwtClaims($tokens['access_token']);
+        $claims = self::jwtClaims(self::stringAt($tokens, 'access_token'));
 
         self::assertSame('/a1/a10/', $claims['dom']);
-        self::assertContains(['/a1/a10/', true, '*:r vehicle:w'], $claims['acl']);
-        self::assertContains(['/a1/a10/', true, 'user:w:own'], $claims['acl'], 'ACCESS_DEFAULT_EXPRESSION');
+        self::assertContains(['/a1/a10/', true, '*:r vehicle:w'], self::arrayAt($claims, 'acl'));
+        self::assertContains(['/a1/a10/', true, 'user:w:own'], self::arrayAt($claims, 'acl'), 'ACCESS_DEFAULT_EXPRESSION');
 
         $bob = $this->principal($tokens, $key);
         self::assertTrue($bob->can('vehicle', AccessLevel::Write, '/a1/a10/a101/'), 'inherited by subdomains');
@@ -110,8 +108,8 @@ final class DomainAccessTest extends OAuthTestCase
         $this->confirm('alice');
 
         [$status, $tokens] = $this->tokenRequest(['grant_type' => 'authorization_code', 'code' => $this->codeFromRedirect(), 'redirect_uri' => self::REDIRECT_URI, 'code_verifier' => $pkce['verifier']], $key);
-        self::assertSame(200, $status, json_encode($tokens));
-        $claims = self::jwtClaims($tokens['access_token']);
+        self::assertSame(200, $status, (string) json_encode($tokens));
+        $claims = self::jwtClaims(self::stringAt($tokens, 'access_token'));
         self::assertSame('app-bob', $claims['sub']);
         self::assertSame(['sub' => 'app-alice'], $claims['act']);
         self::assertSame(Impersonation::MODE_READ_ONLY, $claims['imp_mode']);
@@ -159,8 +157,8 @@ final class DomainAccessTest extends OAuthTestCase
         self::assertSelectorExists('.alert.ok');
         self::assertSame('invoice:r tire:w', $this->manager()->findGrant($this->user('dave'), $this->domain('a100'))?->getExpression()->toString());
         $hook = $this->webhookOf(WebhookEvent::USER_ACCESS_CHANGED);
-        self::assertSame('app-dave', $hook['data']['user_id']);
-        self::assertSame('app-alice', $hook['data']['actor_id']);
+        self::assertSame('app-dave', self::arrayAt($hook, 'data')['user_id'] ?? null);
+        self::assertSame('app-alice', self::arrayAt($hook, 'data')['actor_id'] ?? null);
 
         // Beyond her rights: a power she does not hold.
         $this->grant('alice', 'dave', 'a100', 'tire:w @impersonate:r');
@@ -206,7 +204,9 @@ final class DomainAccessTest extends OAuthTestCase
     public function testImpersonateButtonUsesTheClientEntryPoint(): void
     {
         $em = $this->em();
-        $policy = new ClientPolicy($em->find(Client::class, self::CLIENT_ID));
+        $client = $em->find(Client::class, self::CLIENT_ID);
+        self::assertNotNull($client);
+        $policy = new ClientPolicy($client);
         $policy->setImpersonationStartUri('http://spa.test/impersonate?user={user}');
         $em->persist($policy);
         $em->flush();
@@ -229,7 +229,7 @@ final class DomainAccessTest extends OAuthTestCase
             'grants' => [['user' => 'carla', 'domain' => 'a10', 'rights' => 'vehicle:r'], ['user' => 'dave', 'domain' => 'a100', 'rights' => 'boat:w']],
         ]));
 
-        $tester = new CommandTester((new Application(static::$kernel))->find('app:access:import'));
+        $tester = $this->command('app:access:import');
         $status = $tester->execute(['file' => $file]);
         unlink($file);
 
@@ -246,12 +246,15 @@ final class DomainAccessTest extends OAuthTestCase
 
     private function domain(string $code): Domain
     {
-        return $this->em()->getRepository(Domain::class)->findOneBy(['code' => $code]);
+        $domain = $this->em()->getRepository(Domain::class)->findOneBy(['code' => $code]);
+        self::assertNotNull($domain);
+
+        return $domain;
     }
 
     private function user(string $name): User
     {
-        return $this->em()->getRepository(User::class)->findOneBy(['username' => $name]);
+        return $this->userNamed($name);
     }
 
     private function secret(string $name): string
@@ -295,7 +298,7 @@ final class DomainAccessTest extends OAuthTestCase
     }
 
     /**
-     * @return array{array<string, mixed>, DpopProofFactory}
+     * @return array{array<mixed>, DpopProofFactory}
      */
     private function tokensFor(string $name): array
     {
@@ -303,13 +306,13 @@ final class DomainAccessTest extends OAuthTestCase
         $key = DpopProofFactory::withNewKey();
         $this->loginThroughAuthorize($name, self::authorizeUrl($pkce['challenge']));
         [$status, $tokens] = $this->tokenRequest(['grant_type' => 'authorization_code', 'code' => $this->codeFromRedirect(), 'redirect_uri' => self::REDIRECT_URI, 'code_verifier' => $pkce['verifier']], $key);
-        self::assertSame(200, $status, json_encode($tokens));
+        self::assertSame(200, $status, (string) json_encode($tokens));
 
         return [$tokens, $key];
     }
 
     /**
-     * @param array<string, mixed> $tokens
+     * @param array<mixed> $tokens
      */
     private function principal(array $tokens, DpopProofFactory $key): Principal
     {
@@ -319,7 +322,7 @@ final class DomainAccessTest extends OAuthTestCase
             new DpopProofValidator(new InMemoryReplayStore()),
         );
 
-        return $guard->authenticate('GET', self::API, 'DPoP '.$tokens['access_token'], [$key->create('GET', self::API, $tokens['access_token'])]);
+        return $guard->authenticate('GET', self::API, 'DPoP '.self::stringAt($tokens, 'access_token'), [$key->create('GET', self::API, self::stringAt($tokens, 'access_token'))]);
     }
 
     private function assertAccessDenied(): void
@@ -331,7 +334,7 @@ final class DomainAccessTest extends OAuthTestCase
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<mixed>
      */
     private function webhookOf(string $type): array
     {

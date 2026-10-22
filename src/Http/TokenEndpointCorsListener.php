@@ -25,10 +25,13 @@ final readonly class TokenEndpointCorsListener
     /** @var list<string> */
     private array $allowedOrigins;
 
+    /**
+     * @param array<mixed> $allowedOrigins
+     */
     public function __construct(#[Autowire('%env(csv:CORS_ALLOWED_ORIGINS)%')] array $allowedOrigins)
     {
         $this->allowedOrigins = array_values(array_filter(array_map(
-            static fn (string $o): string => rtrim(trim($o), '/'),
+            static fn (mixed $o): string => \is_string($o) ? rtrim(trim($o), '/') : '',
             $allowedOrigins,
         )));
     }

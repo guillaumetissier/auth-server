@@ -49,7 +49,13 @@ final readonly class GenerateKeysCommand
 
             return Command::FAILURE;
         }
-        $publicPem = openssl_pkey_get_details($key)['key'];
+        $details = openssl_pkey_get_details($key);
+        $publicPem = \is_array($details) && \is_string($details['key'] ?? null) ? $details['key'] : null;
+        if (!\is_string($privatePem) || null === $publicPem) {
+            $io->error('Unable to export the key pair: '.openssl_error_string());
+
+            return Command::FAILURE;
+        }
 
         $fs = new Filesystem();
         $fs->mkdir(\dirname($this->privateKeyPath), 0700);

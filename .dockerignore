@@ -13,6 +13,7 @@ node_modules
 composer.local.json
 composer.local.lock
 .php-cs-fixer.dist.php
+phpstan.dist.neon
 # Secrets and local overrides (the committed .env holds defaults only and is needed)
 .env.docker
 .env.local

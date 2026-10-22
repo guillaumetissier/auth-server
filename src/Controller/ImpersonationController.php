@@ -124,7 +124,7 @@ final class ImpersonationController extends AbstractController
                 'POST',
                 rtrim($issuer, '/').'/impersonation/end',
                 $request->headers->get('Authorization'),
-                $request->headers->all('dpop'),
+                array_values(array_filter($request->headers->all('dpop'), \is_string(...))),
             );
         } catch (AuthenticationFailed $e) {
             return new JsonResponse($e->toArray(), $e->statusCode, ['WWW-Authenticate' => $e->wwwAuthenticate()]);

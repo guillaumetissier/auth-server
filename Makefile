@@ -1,7 +1,7 @@
 COMPOSE  = docker compose
 CONSOLE  = $(COMPOSE) exec auth-server php bin/console
 
-.PHONY: help secrets up down logs user import 2fa-status role impersonations client client-policy resource-type domain access access-import purge test cs fixcs
+.PHONY: help secrets up down logs user import 2fa-status role impersonations client client-policy resource-type domain access access-import purge test cs fixcs stan
 
 help: ## List the targets
 	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-14s %s\n", $$1, $$2}'
@@ -75,3 +75,6 @@ cs: ## Check the coding standard (PHP-CS-Fixer), change nothing
 
 fixcs: ## Fix the coding standard
 	composer fixcs
+
+stan: ## Static analysis (PHPStan, level max)
+	composer stan

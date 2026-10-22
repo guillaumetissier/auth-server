@@ -43,10 +43,9 @@ final readonly class DpopBindingRefreshTokenRepository implements RefreshTokenRe
             return;
         }
 
-        $this->em->persist(new DpopBinding(
-            $this->em->getReference(RefreshTokenModel::class, $refreshTokenEntity->getIdentifier()),
-            $jkt,
-        ));
+        $refreshToken = $this->em->getReference(RefreshTokenModel::class, $refreshTokenEntity->getIdentifier())
+            ?? throw new \LogicException('The refresh token was not persisted.');
+        $this->em->persist(new DpopBinding($refreshToken, $jkt));
         $this->em->flush();
     }
 

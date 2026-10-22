@@ -31,6 +31,8 @@ abstract class OAuthTestCase extends WebTestCase
 
     protected function setUp(): void
     {
+        // A test that failed in the middle of a request can leave the kernel booted.
+        self::ensureKernelShutdown();
         $this->browser = static::createClient();
         RecordingHttpClient::$requests = [];
 
@@ -54,7 +56,7 @@ abstract class OAuthTestCase extends WebTestCase
     }
 
     /**
-     * @return array{User, string|null} the user and its plain TOTP secret
+     * @return ($withTotp is true ? array{User, string} : array{User, null}) the user and its plain TOTP secret
      */
     protected function createUser(string $username = 'alice', string $externalId = 'app-1001', bool $withTotp = true): array
     {
@@ -76,6 +78,10 @@ abstract class OAuthTestCase extends WebTestCase
 
     protected static function totp(string $secret): string
     {
+        if ('' === $secret) {
+            self::fail('Empty TOTP secret.');
+        }
+
         return TOTP::createFromSecret($secret)->now();
     }
 
@@ -89,6 +95,9 @@ abstract class OAuthTestCase extends WebTestCase
         return ['verifier' => $verifier, 'challenge' => rtrim(strtr(base64_encode(hash('sha256', $verifier, true)), '+/', '-_'), '=')];
     }
 
+    /**
+     * @param array<string, string|null> $overrides null removes the parameter
+     */
     protected static function authorizeUrl(string $challenge, array $overrides = []): string
     {
         return '/authorize?'.http_build_query($overrides + [
@@ -141,13 +150,13 @@ abstract class OAuthTestCase extends WebTestCase
         parse_str((string) parse_url($location, \PHP_URL_QUERY), $query);
         self::assertSame('xyz', $query['state'] ?? null);
 
-        return (string) $query['code'];
+        return self::stringAt($query, 'code');
     }
 
     /**
      * @param array<string, string> $params
      *
-     * @return array{int, array<string, mixed>}
+     * @return array{int, array<mixed>}
      */
     protected function tokenRequest(array $params, ?DpopProofFactory $dpop): array
     {
@@ -159,22 +168,88 @@ abstract class OAuthTestCase extends WebTestCase
         $this->browser->request('POST', '/token', $params + ['client_id' => self::CLIENT_ID], server: $server);
         $response = $this->browser->getResponse();
 
-        return [$response->getStatusCode(), json_decode((string) $response->getContent(), true) ?? []];
+        $body = json_decode((string) $response->getContent(), true);
+
+        return [$response->getStatusCode(), \is_array($body) ? $body : []];
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<mixed>
      */
     protected static function jwtClaims(string $jwt): array
     {
-        return json_decode(base64_decode(strtr(explode('.', $jwt)[1], '-_', '+/')), true);
+        $claims = json_decode(base64_decode(strtr(explode('.', $jwt)[1] ?? '', '-_', '+/')), true);
+        self::assertIsArray($claims, 'not a JWT');
+
+        return $claims;
     }
 
     /**
-     * @return list<array<string, mixed>> decoded webhook payloads sent so far
+     * @return list<array<mixed>> decoded webhook payloads sent so far
      */
     protected static function webhooks(): array
     {
-        return array_map(static fn (array $r): array => json_decode($r['options']['body'], true), RecordingHttpClient::$requests);
+        return array_map(static function (array $request): array {
+            $payload = json_decode(self::stringAt(self::arrayAt($request, 'options'), 'body'), true);
+            self::assertIsArray($payload);
+
+            return $payload;
+        }, RecordingHttpClient::$requests);
+    }
+
+    /**
+     * Body of the last response, decoded.
+     *
+     * @return array<mixed>
+     */
+    protected function responseJson(): array
+    {
+        $data = json_decode((string) $this->browser->getResponse()->getContent(), true);
+        self::assertIsArray($data, 'the response is not a JSON object');
+
+        return $data;
+    }
+
+    protected function userNamed(string $username): User
+    {
+        $user = $this->em()->getRepository(User::class)->findOneBy(['username' => $username]);
+        self::assertNotNull($user, \sprintf('no user "%s"', $username));
+
+        return $user;
+    }
+
+    protected function command(string $name): \Symfony\Component\Console\Tester\CommandTester
+    {
+        self::assertNotNull(static::$kernel);
+
+        return new \Symfony\Component\Console\Tester\CommandTester((new \Symfony\Bundle\FrameworkBundle\Console\Application(static::$kernel))->find($name));
+    }
+
+    /**
+     * $data[$key], which must be a string.
+     *
+     * @param array<mixed> $data
+     */
+    protected static function stringAt(array $data, string|int $key): string
+    {
+        $value = $data[$key] ?? null;
+        self::assertIsString($value, \sprintf('"%s" is missing or not a string', $key));
+
+        return $value;
+    }
+
+    /**
+     * $data[$key], which must be an array.
+     *
+     * @param array<mixed> $data
+     *
+     * @return array<mixed>
+     */
+    protected static function arrayAt(array $data, string|int $key): array
+    {
+        $value = $data[$key] ?? null;
+        self::assertIsArray($value, \sprintf('"%s" is missing or not an array', $key));
+
+        return $value;
     }
 }

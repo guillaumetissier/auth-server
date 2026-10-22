@@ -64,6 +64,9 @@ final readonly class WellKnownController
         return new JsonResponse(['status' => 'ok'], 200, ['Cache-Control' => 'no-store']);
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     private function cacheable(array $data, int $maxAge): JsonResponse
     {
         $response = new JsonResponse($data, 200, ['Access-Control-Allow-Origin' => '*']);

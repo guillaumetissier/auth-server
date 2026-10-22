@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional;
 
-use App\Entity\User;
 use App\Security\LoginAttemptSubscriber;
 use GuillaumeTissier\ResourceGuard\Webhook\WebhookEvent;
 
@@ -37,7 +36,7 @@ final class TwoFactorAndLockoutTest extends OAuthTestCase
         $this->browser->click($crawler->selectLink('I have saved them, continue')->link());
         self::codeFromRedirect();
 
-        $user = $this->em()->getRepository(User::class)->findOneBy(['username' => 'alice']);
+        $user = $this->userNamed('alice');
         self::assertNotNull($user->getEncryptedTotpSecret());
         self::assertStringNotContainsString($secret, (string) $user->getEncryptedTotpSecret(), 'TOTP secret must be encrypted at rest');
     }

@@ -15,6 +15,7 @@ use GuillaumeTissier\ResourceGuard\Webhook\WebhookSignature;
 
 $payload = (string) file_get_contents('php://input');
 $header = $_SERVER['HTTP_X_AUTH_SERVER_SIGNATURE'] ?? null;
+$header = is_string($header) ? $header : null;
 $valid = (new WebhookSignature((string) getenv('WEBHOOK_SECRET')))->verify($payload, $header);
 
 $line = $valid

@@ -6,6 +6,13 @@ one version number covers the server image and `@guillaumetissier/oauth-dpop-cli
 
 ## [Unreleased]
 
+### Added
+- PHPStan at level max with the Symfony and Doctrine extensions (`composer stan`, `make stan`, CI job).
+
+### Changed
+- `app:access:import` validates the file into typed records before writing anything.
+- `symfony/var-exporter` is required explicitly (Doctrine lazy objects on PHP 8.3).
+
 ## [1.0.0] - unreleased
 
 First public version.

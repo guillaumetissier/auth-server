@@ -246,11 +246,14 @@ final class AdminController extends AbstractController
 
         try {
             $expression = AccessExpression::parse($request->request->getString('rights'));
-            $denial = $expression->isEmpty() ? 'Give at least one rule, or remove the grant.' : null;
         } catch (InvalidAccessExpression $e) {
-            $denial = $e->getMessage();
+            $this->addFlash('error', $e->getMessage());
+
+            return $this->redirectToRoute('app_admin_user', ['id' => $id, 'preview' => $domain->getCode()]);
         }
-        $denial ??= $this->policy->grantDenial($actor, $target, $domain, $expression, $includeSubdomains, $this->manager->findGrant($target, $domain));
+        $denial = $expression->isEmpty()
+            ? 'Give at least one rule, or remove the grant.'
+            : $this->policy->grantDenial($actor, $target, $domain, $expression, $includeSubdomains, $this->manager->findGrant($target, $domain));
 
         if (null !== $denial) {
             $this->addFlash('error', $denial);

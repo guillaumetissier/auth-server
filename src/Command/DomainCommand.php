@@ -7,6 +7,7 @@ namespace App\Command;
 use App\Access\AccessManager;
 use App\Access\AccessPolicy;
 use App\Entity\Domain;
+use App\Entity\User;
 use App\Repository\DomainRepository;
 use App\Repository\UserRepository;
 use GuillaumeTissier\ResourceGuard\Access\AccessExpression;
@@ -106,7 +107,7 @@ final readonly class DomainCommand
         return Command::SUCCESS;
     }
 
-    private function ownerDenial(Domain $domain, ?object $owner, AccessExpression $expression): ?string
+    private function ownerDenial(Domain $domain, ?User $owner, AccessExpression $expression): ?string
     {
         if (null !== ($error = $this->policy->unknownTypes($expression))) {
             return $error;
