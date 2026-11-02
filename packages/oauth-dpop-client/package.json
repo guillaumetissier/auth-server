@@ -1,15 +1,25 @@
 {
   "name": "@guillaumetissier/oauth-dpop-client",
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "private": true,
   "description": "Browser OAuth2 client for Authorization Code + PKCE with DPoP-bound tokens (RFC 9449), WebCrypto only, zero dependencies.",
-  "keywords": ["oauth2", "pkce", "dpop", "rfc9449", "webcrypto", "spa"],
+  "keywords": [
+    "oauth2",
+    "pkce",
+    "dpop",
+    "rfc9449",
+    "webcrypto",
+    "spa",
+    "javascript",
+    "browser"
+  ],
   "license": "MIT",
   "author": "Guillaume Tissier",
-  "homepage": "https://github.com/guillaumetissier/auth-server/tree/main/packages/dpop-client-ts#readme",
+  "homepage": "https://github.com/guillaumetissier/auth-server/tree/main/packages/oauth-dpop-client#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/guillaumetissier/auth-server.git",
-    "directory": "packages/dpop-client-ts"
+    "directory": "packages/oauth-dpop-client"
   },
   "bugs": "https://github.com/guillaumetissier/auth-server/issues",
   "type": "module",
@@ -20,19 +30,16 @@
     ".": {
       "types": "./dist/oauth-dpop.d.ts",
       "default": "./dist/oauth-dpop.js"
-    }
+    },
+    "./global": "./dist/oauth-dpop.global.js",
+    "./package.json": "./package.json"
   },
-  "files": ["dist", "src", "README.md", "LICENSE"],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node scripts/build-global.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "prepublishOnly": "npm run build"
+    "test": "npm run build && node --test \"test/*.test.mjs\""
   },
   "devDependencies": {
     "typescript": "^5.9.0"
-  },
-  "publishConfig": {
-    "access": "public",
-    "provenance": true
   }
 }

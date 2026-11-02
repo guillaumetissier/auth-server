@@ -1,0 +1,60 @@
+// The requests offered by the demo, with what to expect for the demo users of "make seed".
+export const requests = [
+  {
+    id: 'status',
+    label: 'Public status',
+    method: 'GET',
+    path: '/api/public/status',
+    hint: 'No token needed: always 200.',
+  },
+  {
+    id: 'me',
+    label: 'Who am I?',
+    method: 'GET',
+    path: '/api/me',
+    hint: 'Any valid token: shows what the API reads from it.',
+  },
+  {
+    id: 'vehicles',
+    label: 'List vehicles',
+    method: 'GET',
+    path: '/api/vehicles',
+    hint: 'Lists the vehicles of the domains where you may read; 403 if none.',
+  },
+  {
+    id: 'vehicle-other',
+    label: 'Vehicle of another domain',
+    method: 'GET',
+    path: '/api/vehicles/V-2001',
+    hint: 'V-2001 belongs to domain a11 (South): refused to users of a10.',
+  },
+  {
+    id: 'vehicle-create',
+    label: 'Create a vehicle',
+    method: 'POST',
+    path: '/api/vehicles',
+    body: { model: 'Citroën C3' },
+    hint: 'Needs write access to vehicles in your domain.',
+  },
+  {
+    id: 'vehicle-delete',
+    label: 'Delete a vehicle',
+    method: 'DELETE',
+    path: '/api/vehicles/V-1001',
+    hint: 'Needs manage access, the highest level.',
+  },
+  {
+    id: 'invoices',
+    label: 'List invoices',
+    method: 'GET',
+    path: '/api/invoices',
+    hint: 'Needs read access to invoices.',
+  },
+  {
+    id: 'invoices-export',
+    label: 'Export invoices',
+    method: 'GET',
+    path: '/api/invoices/export',
+    hint: 'Needs the scope invoices.export, which the demo client does not have: always 403.',
+  },
+];

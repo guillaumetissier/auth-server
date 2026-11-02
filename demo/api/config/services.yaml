@@ -1,0 +1,30 @@
+parameters:
+    demo.spa_origin: '%env(DEMO_SPA_ORIGIN)%'
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    App\:
+        resource: '../src/'
+        exclude: ['../src/Kernel.php']
+
+    App\EventSubscriber\CorsSubscriber:
+        arguments: { $allowedOrigin: '%demo.spa_origin%' }
+
+    # --- resource-guard (see its README, section Symfony) ---
+    resource_guard.cache:
+        class: Symfony\Component\Cache\Psr16Cache
+        arguments: ['@cache.app']
+    GuillaumeTissier\ResourceGuard\Token\JwksProviderInterface:
+        class: GuillaumeTissier\ResourceGuard\Token\HttpJwksProvider
+        arguments: ['%env(AUTH_SERVER_JWKS_URI)%', '@psr18.http_client', '@psr18.http_client', '@resource_guard.cache']
+    GuillaumeTissier\ResourceGuard\Dpop\ReplayStoreInterface:
+        class: GuillaumeTissier\ResourceGuard\Dpop\Psr16ReplayStore
+        arguments: ['@resource_guard.cache']
+    GuillaumeTissier\ResourceGuard\Dpop\DpopProofValidator: ~
+    GuillaumeTissier\ResourceGuard\Token\AccessTokenValidator:
+        arguments: { $allowedClientIds: '%env(csv:AUTH_SERVER_ALLOWED_CLIENTS)%' }
+    GuillaumeTissier\ResourceGuard\Guard\ResourceGuard: ~
+    GuillaumeTissier\ResourceGuard\Bridge\Symfony\ResourceGuardAuthenticator: ~

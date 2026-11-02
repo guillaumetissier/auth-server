@@ -1,5 +1,5 @@
-# On a version tag (v1.2.3): pushes the server image to GitHub Container Registry and the
-# browser client to npm. Needs an NPM_TOKEN secret (automation token of the npm account).
+# On a version tag (v1.2.3): pushes the server image to GitHub Container Registry, and creates the
+# GitHub release with the browser client attached (oauth-dpop.js, oauth-dpop.global.js).
 name: Release
 
 on:
@@ -40,23 +40,24 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  npm:
+  browser-client:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      id-token: write   # npm provenance
+      contents: write   # GitHub release
     defaults:
       run:
-        working-directory: packages/dpop-client-ts
+        working-directory: packages/oauth-dpop-client
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          registry-url: https://registry.npmjs.org
-      - name: Use the tag as package version
-        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
-      - run: npm install --no-audit --no-fund
-      - run: npm publish
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - name: Create the GitHub release with the client files
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes "See CHANGELOG.md." \
+            dist/oauth-dpop.js dist/oauth-dpop.global.js src/oauth-dpop.ts \
+          || gh release upload "$GITHUB_REF_NAME" dist/oauth-dpop.js dist/oauth-dpop.global.js src/oauth-dpop.ts --clobber

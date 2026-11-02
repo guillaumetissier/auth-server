@@ -1,0 +1,36 @@
+# Demo: a React SPA and a Symfony API using the auth server.
+# The auth server must be running first (make up in the parent folder): the API joins its "auth-server"
+# network to download the signing keys.
+name: auth-server-demo
+
+services:
+  demo-api:
+    build: ./api
+    restart: unless-stopped
+    environment:
+      AUTH_SERVER_JWKS_URI: http://auth-server:8080/.well-known/jwks.json
+      AUTH_SERVER_ALLOWED_CLIENTS: my-spa
+      DEMO_SPA_ORIGIN: http://localhost:5173
+    ports:
+      - "8081:8080"
+    networks:
+      - auth-server
+
+  demo-spa:
+    build:
+      context: ./spa
+      # The browser client of this repository (see spa/Dockerfile). Needs Docker Compose 2.17 or later.
+      additional_contexts:
+        oauth-dpop-client: ../packages/oauth-dpop-client
+      args:
+        # As the browser reaches them.
+        VITE_ISSUER: http://localhost:8080
+        VITE_CLIENT_ID: my-spa
+        VITE_API_URL: http://localhost:8081
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+
+networks:
+  auth-server:
+    external: true

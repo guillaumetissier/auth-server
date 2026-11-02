@@ -22,7 +22,8 @@ run again on the same database. The CI runs it against the Docker image and MySQ
 |---|---|
 | `src/`, `config/`, `templates/`, `migrations/`, `tests/` | The Symfony 7.4 application (league/oauth2-server-bundle, scheb/2fa, Twig pages) |
 | `docker/`, `Dockerfile`, `docker-compose.yml` | Image (FrankenPHP), PHP settings, start-up script; the stack with MySQL 8.4 |
-| `packages/dpop-client-ts/` | Browser helper published on npm as `@guillaumetissier/oauth-dpop-client` |
+| `packages/oauth-dpop-client/` | Browser client (TypeScript, no dependency), with its tests: `npm test` in that folder |
+| `demo/` | Test setup: a React SPA and a Symfony API protected by resource-guard, see [demo/README.md](../demo/README.md) |
 | `tools/` | `oauth-cli.php` (manual testing), `e2e.php` (end-to-end check), `webhook-receiver.php` |
 
 ## Working on resource-guard and the server together
@@ -38,14 +39,16 @@ composer require guillaumetissier/resource-guard:@dev
 
 ## Releasing
 
-The server image and the npm package share one version number. Update `CHANGELOG.md`, then tag:
+Update `CHANGELOG.md`, then tag:
 
 ```bash
 git tag -a v0.1.0 -m "v0.1.0" && git push origin v0.1.0
 ```
 
-GitHub Actions (`release.yml`) pushes the image to GitHub Container Registry and publishes the npm package
-(needs the `NPM_TOKEN` secret). `guillaumetissier/resource-guard` lives in its own repository.
+GitHub Actions (`release.yml`) pushes the image to GitHub Container Registry and creates the GitHub
+release, with the browser client attached (`oauth-dpop.js`, `oauth-dpop.global.js`, `oauth-dpop.ts`).
+The PHP library [resource-guard](https://github.com/guillaumetissier/resource-guard) lives in its own
+repository, with its own versions.
 
 ## Roadmap
 

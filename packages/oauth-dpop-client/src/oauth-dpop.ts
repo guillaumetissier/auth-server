@@ -1,5 +1,5 @@
 /**
- * Browser-side helper for the auth server: Authorization Code + PKCE, DPoP proofs, token refresh.
+ * Browser-side helper for an OAuth 2 authorization server: Authorization Code + PKCE, DPoP proofs, token refresh.
  * Zero dependencies, WebCrypto only. Drop it into a React / Vite application.
  *
  * The DPoP private key is generated as NON-EXTRACTABLE: JavaScript (including an XSS payload)
@@ -147,6 +147,17 @@ export function exchangeCode(config: AuthServerConfig, keyPair: CryptoKeyPair, c
     redirect_uri: config.redirectUri,
     code_verifier: verifier,
   });
+}
+
+/**
+ * Address of the auth server's logout: it closes the server session (so that the next sign-in asks for
+ * credentials again), then sends the browser to `postLogoutRedirectUri`. That address must have the
+ * origin of one of the client's registered redirect URIs, otherwise the browser lands on the login page.
+ * Forget the tokens and the key pair on your side before going there.
+ */
+export function logoutUrl(config: AuthServerConfig, postLogoutRedirectUri: string): string {
+  const params = new URLSearchParams({ client_id: config.clientId, post_logout_redirect_uri: postLogoutRedirectUri });
+  return `${config.issuer}/logout?${params}`;
 }
 
 /** Refresh tokens are bound to the same key: use the same CryptoKeyPair. */

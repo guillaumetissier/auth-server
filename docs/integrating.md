@@ -1,5 +1,7 @@
 # Connecting an application
 
+A working example of everything below is in [`demo/`](../demo/README.md): a React SPA and a Symfony API.
+
 An application uses the auth server in two places:
 
 - **the browser part** signs users in and obtains tokens (a single-page application, or the front-end of
@@ -21,12 +23,13 @@ The client is public (no secret): this is the right type for browser application
 
 ## 2. Browser part
 
-```bash
-npm install @guillaumetissier/oauth-dpop-client
-```
+Use the browser client of this repository, [`packages/oauth-dpop-client`](../packages/oauth-dpop-client/README.md).
+It is not published on npm: copy `src/oauth-dpop.ts` into your project (TypeScript), or take
+`oauth-dpop.js` (ES module) or `oauth-dpop.global.js` (classic `<script>`, global `OAuthDpop`) from the
+[GitHub release](https://github.com/guillaumetissier/auth-server/releases) of your server version.
 
 ```ts
-import { generateDpopKeyPair, buildAuthorizeUrl, exchangeCode, dpopFetch } from '@guillaumetissier/oauth-dpop-client';
+import { generateDpopKeyPair, buildAuthorizeUrl, exchangeCode, dpopFetch } from './oauth-dpop';
 
 const config = { issuer: 'https://auth.example.com', clientId: 'my-app', redirectUri: 'https://app.example.com/callback' };
 const keyPair = await generateDpopKeyPair();      // non-extractable; keep it in IndexedDB
@@ -36,7 +39,12 @@ const tokens = await exchangeCode(config, keyPair, code, verifier);
 const response = await dpopFetch(keyPair, tokens, '/api/items');
 ```
 
-Details: [packages/dpop-client-ts/README.md](../packages/dpop-client-ts/README.md).
+To sign out, forget the tokens and the key pair, then send the browser to
+`logoutUrl(config, 'https://app.example.com/')`. The auth server closes its own session (otherwise the next
+sign-in would not ask for credentials) and sends the browser back to that address, provided it has the
+origin of one of the client's redirect URIs.
+
+Details: [packages/oauth-dpop-client/README.md](../packages/oauth-dpop-client/README.md).
 
 ## 3. API part
 

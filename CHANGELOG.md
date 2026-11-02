@@ -1,10 +1,23 @@
 # Changelog
 
 All notable changes are documented here. The project follows [Semantic Versioning](https://semver.org/);
-one version number covers the server image and `@guillaumetissier/oauth-dpop-client`.
-`guillaumetissier/resource-guard` has its own repository and changelog.
+one version number covers the server and its browser client (`packages/oauth-dpop-client`).
+`guillaumetissier/resource-guard` (PHP) has its own repository and changelog.
 
 ## [Unreleased]
+
+## [0.2.0] - 2026-11-02
+
+- `demo/`: a React SPA and a Symfony API (resource-guard), each in its own container, with a seed script
+  (client, users, domains, rights). The SPA shows the resources received or the error and the reason of each
+  refusal, and can break its requests on purpose (no proof, Bearer, tampered token, replayed proof).
+- Browser client `packages/oauth-dpop-client` (PKCE, DPoP proofs, refresh, impersonation), with tests, as
+  TypeScript source, ES module and classic script (global `OAuthDpop`). Not published on npm: the release
+  workflow attaches the files to the GitHub release.
+- Logout started by an application: `GET /logout?client_id=…&post_logout_redirect_uri=…` closes the server
+  session, then sends the browser back to the application (only to the origin of one of the client's
+  redirect URIs). Advertised as `end_session_endpoint`; `logoutUrl()` in the browser client. The demo SPA
+  uses it, so that signing out and in again asks for credentials.
 
 ## [0.1.0] - 2026-10-22
 
@@ -21,9 +34,6 @@ First public version.
   `user.access_changed` webhook; JSON import with dry run.
 - Administration pages: domains, users, rights with delegation bounds and preview, platform roles, resource
   types, Impersonate button through a per-client entry point. Impersonation by domain users holding `@impersonate`.
-
-### Browser client
-- `@guillaumetissier/oauth-dpop-client`: browser helper for PKCE, DPoP proofs, token exchange and refresh, impersonation.
 
 ### Deployment and tooling
 - Docker image (FrankenPHP) and Docker Compose stack with MySQL 8.4; `make` commands for every administration task.

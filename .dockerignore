@@ -2,9 +2,10 @@
 .git
 .github
 .oauth-cli
-packages
 tools
 tests
+demo
+packages
 var
 vendor
 node_modules

@@ -464,12 +464,16 @@ are listed in [Operations](docs/operations.md). Domains and rights are explained
 
 1. Register the application: `make client ID=my-app REDIRECT=https://app.example.com/callback`, and add
    its origin to `CORS_ALLOWED_ORIGINS`.
-2. In the browser part, sign users in and call your API with the npm package
-   [`@guillaumetissier/oauth-dpop-client`](packages/dpop-client-ts/README.md).
+2. In the browser part, sign users in and call your API with the browser client of this repository,
+   [`packages/oauth-dpop-client`](packages/oauth-dpop-client/README.md) (one file to copy, or download
+   from the GitHub release).
 3. In your PHP API (Laravel, Symfony or any PSR-15 framework), check the tokens with
    [`guillaumetissier/resource-guard`](https://github.com/guillaumetissier/resource-guard).
 
 The complete walkthrough, with code, is in [Connecting an application](docs/integrating.md).
+
+To see it all working before writing code, start the [demo](demo/README.md): a small React SPA and a
+Symfony API, each in its own container, showing the resources received or the reason of each refusal.
 
 Addresses an application uses (also listed at `/.well-known/oauth-authorization-server`):
 

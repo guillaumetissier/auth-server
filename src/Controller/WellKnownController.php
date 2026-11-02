@@ -48,6 +48,8 @@ final readonly class WellKnownController
             'authorization_endpoint' => $issuer.'/authorize',
             'token_endpoint' => $issuer.'/token',
             'jwks_uri' => $issuer.'/.well-known/jwks.json',
+            // GET, with client_id and post_logout_redirect_uri (origin of a registered redirect URI).
+            'end_session_endpoint' => $issuer.'/logout',
             'response_types_supported' => ['code'],
             'response_modes_supported' => ['query'],
             'grant_types_supported' => ['authorization_code', 'refresh_token'],

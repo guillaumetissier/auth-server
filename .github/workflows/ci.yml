@@ -78,12 +78,27 @@ jobs:
       - run: composer install --no-interaction --no-progress
       - run: composer cs
 
-  dpop-client:
-    name: oauth-dpop-client
+  browser-client:
+    name: Browser client
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: packages/dpop-client-ts
+        working-directory: packages/oauth-dpop-client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm test
+
+  demo-spa:
+    name: Demo SPA build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: demo/spa
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

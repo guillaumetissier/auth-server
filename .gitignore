@@ -19,13 +19,10 @@
 .php-cs-fixer.cache
 composer.local.json
 composer.local.lock
-composer.lock
 
-# --- Node / TypeScript ---
+# --- Node (browser client, demo SPA) ---
 node_modules/
-/packages/dpop-client-ts/dist/
-*.tgz
-npm-debug.log*
+/packages/oauth-dpop-client/dist/
 
 # --- Local tools ---
 # Key and tokens of tools/oauth-cli.php

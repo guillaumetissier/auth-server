@@ -1,0 +1,20 @@
+{
+  "resource_types": [
+    {"code": "vehicle", "label": "Vehicles"},
+    {"code": "invoice", "label": "Invoices"}
+  ],
+  "domains": [
+    {"code": "a1", "name": "Group", "parent": null},
+    {"code": "a10", "name": "North", "parent": "a1"},
+    {"code": "a100", "name": "North depot", "parent": "a10"},
+    {"code": "a11", "name": "South", "parent": "a1"}
+  ],
+  "members": [
+    {"user": "reader", "domain": "a10"},
+    {"user": "manager", "domain": "a10"}
+  ],
+  "grants": [
+    {"user": "reader", "domain": "a10", "subdomains": true, "rights": "vehicle:r"},
+    {"user": "manager", "domain": "a10", "subdomains": true, "rights": "vehicle:m invoice:r"}
+  ]
+}

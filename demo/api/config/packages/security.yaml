@@ -1,0 +1,17 @@
+security:
+    providers:
+        # Every valid token is a user: the API keeps no user table.
+        oauth_users:
+            id: App\Security\OAuthUserProvider
+
+    firewalls:
+        api:
+            pattern: ^/api
+            stateless: true
+            provider: oauth_users
+            custom_authenticators: [GuillaumeTissier\ResourceGuard\Bridge\Symfony\ResourceGuardAuthenticator]
+            entry_point: GuillaumeTissier\ResourceGuard\Bridge\Symfony\ResourceGuardAuthenticator
+
+    access_control:
+        - { path: ^/api/public, roles: PUBLIC_ACCESS }
+        - { path: ^/api, roles: IS_AUTHENTICATED }
