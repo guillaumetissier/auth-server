@@ -38,6 +38,11 @@ final class DomainRepository extends ServiceEntityRepository
         return $qb->getQuery()->getResult();
     }
 
+    public function countChildren(Domain $domain): int
+    {
+        return $this->count(['parent' => $domain]);
+    }
+
     /**
      * Domains owned by $user.
      *

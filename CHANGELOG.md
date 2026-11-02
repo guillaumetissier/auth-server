@@ -6,8 +6,37 @@ one version number covers the server and its browser client (`packages/oauth-dpo
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-02
+
+### Added
+- Dashboard after sign-in: notifications (two-factor not enabled, few backup codes, no e-mail address)
+  and, for administrators, account figures, last sign-ins and last domains created, limited to what they
+  administer. Navigation bar on every page of a signed-in user.
+- Profile page: account, e-mail address and password changes (current password required), two-factor
+  status and set-up, own rights.
+- Password links by e-mail (symfony/mailer, `MAILER_DSN`): "Forgot your password?" on the sign-in page
+  (no account enumeration, rate-limited), links sent by administrators, invitations of new users.
+  Single-use, hashed, expiring (`PASSWORD_RESET_TTL`, `PASSWORD_INVITATION_TTL`); a new password revokes
+  the user's tokens and ends his other sessions. Mailpit in Docker Compose shows the e-mails in development.
+- User administration: creation with invitation, username and e-mail changes, password link, two-factor
+  reset (lost phone), disabling (ends sessions, revokes refresh tokens), deletion with confirmation.
+  Allowed to the super-administrator and to holders of `@access:w`, within their own rights; `ROLE_ADMIN`
+  stays read-only.
+- Domain administration: renaming, deletion of empty domains, users per domain.
+- `users.email` column (migration), `--email` option of `app:user:create` (`make user EMAIL=…`).
+- Webhook events `user.updated`, `user.disabled`, `user.enabled`, `user.deleted`, `user.password_link_sent`.
+
+### Changed
+- Sign-in lands on `/dashboard` instead of `/account`.
+- A disabled account, or a changed password, username or role, ends the open sessions at their next request.
+
+### Fixed
+- A super-administrator without `ROLE_ADMIN` could not open the administration pages unless he belonged
+  to a domain.
+
 ## [0.2.0] - 2026-11-02
 
+### Added (demo and browser client)
 - `demo/`: a React SPA and a Symfony API (resource-guard), each in its own container, with a seed script
   (client, users, domains, rights). The SPA shows the resources received or the error and the reason of each
   refusal, and can break its requests on purpose (no proof, Bearer, tampered token, replayed proof).
@@ -43,3 +72,5 @@ First public version.
 
 [Unreleased]: https://github.com/guillaumetissier/auth-server/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/guillaumetissier/auth-server/releases/tag/v0.1.0
+[0.2.0]: https://github.com/guillaumetissier/auth-server/releases/tag/v0.2.0
+[0.3.0]: https://github.com/guillaumetissier/auth-server/releases/tag/v0.3.0

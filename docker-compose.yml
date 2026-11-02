@@ -49,6 +49,17 @@ services:
     networks:
       - auth-internal
 
+  # Catches the e-mails sent by the auth server (password links) and shows them at http://localhost:8025.
+  # Development only: in production, set MAILER_DSN to your SMTP server in .env.docker.
+  mailpit:
+    image: axllent/mailpit:v1.33.0
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${MAILPIT_PORT:-8025}:8025"
+    networks:
+      - auth-internal
+      - auth-server
+
 volumes:
   auth-db-data:
   auth-keys:

@@ -15,7 +15,7 @@ final class SecurityController extends AbstractController
     public function login(AuthenticationUtils $authenticationUtils): Response
     {
         if ($this->isGranted('IS_AUTHENTICATED_FULLY')) {
-            return $this->redirectToRoute('app_account');
+            return $this->redirectToRoute('app_dashboard');
         }
 
         $response = $this->render('security/login.html.twig', [

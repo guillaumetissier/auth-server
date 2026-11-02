@@ -11,6 +11,7 @@ use Scheb\TwoFactorBundle\Model\BackupCodeInterface;
 use Scheb\TwoFactorBundle\Model\Totp\TotpConfiguration;
 use Scheb\TwoFactorBundle\Model\Totp\TotpConfigurationInterface;
 use Scheb\TwoFactorBundle\Model\Totp\TwoFactorInterface as TotpTwoFactorInterface;
+use Symfony\Component\Security\Core\User\EquatableInterface;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 
@@ -21,7 +22,7 @@ use Symfony\Component\Security\Core\User\UserInterface;
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: 'users')]
 #[ORM\HasLifecycleCallbacks]
-class User implements UserInterface, PasswordAuthenticatedUserInterface, TotpTwoFactorInterface, BackupCodeInterface
+class User implements UserInterface, PasswordAuthenticatedUserInterface, EquatableInterface, TotpTwoFactorInterface, BackupCodeInterface
 {
     /** Can impersonate regular users, read-only. */
     public const ROLE_ADMIN = 'ROLE_ADMIN';
@@ -46,6 +47,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TotpTwo
 
     #[ORM\Column(name: 'external_user_id', length: 64, unique: true)]
     private string $externalUserId;
+
+    /** Where password links are sent. Optional: without it, the user cannot reset his password himself. */
+    #[ORM\Column(length: 180, unique: true, nullable: true)]
+    private ?string $email = null;
+
+    /** SHA-256 of the pending password link (reset or invitation), never the link itself. */
+    #[ORM\Column(name: 'password_link_hash', length: 64, unique: true, nullable: true)]
+    private ?string $passwordLinkHash = null;
+
+    #[ORM\Column(name: 'password_link_expires_at', nullable: true)]
+    private ?\DateTimeImmutable $passwordLinkExpiresAt = null;
 
     /** @var list<string> roles besides ROLE_USER (ROLE_ADMIN, ROLE_SUPER_ADMIN) */
     #[ORM\Column(type: Types::JSON)]
@@ -122,6 +134,24 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TotpTwo
         return $this->username;
     }
 
+    public function setUsername(string $username): void
+    {
+        if ('' === $username) {
+            throw new \InvalidArgumentException('The username cannot be empty.');
+        }
+        $this->username = $username;
+    }
+
+    public function getEmail(): ?string
+    {
+        return $this->email;
+    }
+
+    public function setEmail(?string $email): void
+    {
+        $this->email = null === $email || '' === $email ? null : mb_strtolower($email);
+    }
+
     /**
      * @return non-empty-string
      */
@@ -191,6 +221,48 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TotpTwo
         return $data;
     }
 
+    /**
+     * Compares the user kept in the session with the one freshly loaded at each request: a changed
+     * password, username, roles, or a disabled account ends the session.
+     */
+    public function isEqualTo(UserInterface $user): bool
+    {
+        if (!$user instanceof self) {
+            return false;
+        }
+        // In the session, $this->password holds a CRC of the hash (see __serialize).
+        $sessionPassword = \strlen($this->password) === \strlen($user->password) ? $user->password : hash('crc32c', $user->password);
+
+        return $user->enabled
+            && $this->username === $user->username
+            && hash_equals($this->password, $sessionPassword)
+            && $this->getRoles() == $user->getRoles();
+    }
+
+    // --- Password link (reset or invitation) ------------------------------------------
+
+    public function setPasswordLink(string $hash, \DateTimeImmutable $expiresAt): void
+    {
+        $this->passwordLinkHash = $hash;
+        $this->passwordLinkExpiresAt = $expiresAt;
+    }
+
+    public function clearPasswordLink(): void
+    {
+        $this->passwordLinkHash = null;
+        $this->passwordLinkExpiresAt = null;
+    }
+
+    public function hasValidPasswordLink(\DateTimeImmutable $now): bool
+    {
+        return null !== $this->passwordLinkHash && null !== $this->passwordLinkExpiresAt && $this->passwordLinkExpiresAt > $now;
+    }
+
+    public function getPasswordLinkExpiresAt(): ?\DateTimeImmutable
+    {
+        return $this->passwordLinkExpiresAt;
+    }
+
     // --- Account status -----------------------------------------------------------------
 
     public function getDomain(): ?Domain
@@ -238,6 +310,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TotpTwo
         }
 
         return false;
+    }
+
+    /** After an administrator's or a password-link unlock. */
+    public function unlock(): void
+    {
+        $this->failedLoginAttempts = 0;
+        $this->lockedUntil = null;
     }
 
     public function registerSuccessfulLogin(\DateTimeImmutable $now): void

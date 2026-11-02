@@ -48,6 +48,11 @@ This creates in the auth server:
 | `outsider` | 103 | none | none | Signed in, but allowed nothing |
 | `support` | 100 | none | `ROLE_ADMIN` | Impersonates users, in read-only mode |
 
+Each user has the e-mail address `<user>@demo.test`: "Forgot your password?" on the sign-in page sends
+the link to Mailpit, <http://localhost:8025>. The auth server's own pages (dashboard, profile,
+administration) are at <http://localhost:8080>: sign in there as `support` to look at the users and
+domains of the demo.
+
 The command can be run again: what already exists is kept. Expected end of the output:
 
 ```

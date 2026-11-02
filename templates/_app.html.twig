@@ -1,0 +1,23 @@
+{#- Pages of a signed-in user: navigation bar, wide layout. -#}
+{% extends 'base.html.twig' %}
+
+{% block main_attributes %} class="wide"{% endblock %}
+
+{% block flashes %}{% endblock %}
+
+{% block body %}
+    {% set current = app.request.attributes.get('_route') %}
+    <nav class="admin" aria-label="Main">
+        <a href="{{ path('app_dashboard') }}"{% if current == 'app_dashboard' %} aria-current="page"{% endif %}>Dashboard</a>
+        <a href="{{ path('app_account') }}"{% if current == 'app_account' %} aria-current="page"{% endif %}>My profile</a>
+        {% if can_administer() %}
+            <a href="{{ path('app_admin_users') }}"{% if current starts with 'app_admin_user' %} aria-current="page"{% endif %}>Users</a>
+            <a href="{{ path('app_admin_domains') }}"{% if current starts with 'app_admin_domain' %} aria-current="page"{% endif %}>Domains</a>
+            <a href="{{ path('app_admin_resource_types') }}"{% if current == 'app_admin_resource_types' %} aria-current="page"{% endif %}>Resource types</a>
+        {% endif %}
+        <span class="who">{{ app.user.username }}{% if app.user.domain %} · {{ app.user.domain.path }}{% endif %}
+            · <a href="{{ path('app_logout') }}">Sign out</a></span>
+    </nav>
+    {{ include('_flashes.html.twig') }}
+    {% block content %}{% endblock %}
+{% endblock %}

@@ -3,13 +3,59 @@
 {% block title %}{{ target.username }}{% endblock %}
 
 {% block content %}
+    <p class="muted"><a href="{{ path('app_admin_users') }}">Users</a> /</p>
     <h1>{{ target.username }}
         {% if 'ROLE_SUPER_ADMIN' in target.roles %}<span class="badge">super-admin</span>{% elseif 'ROLE_ADMIN' in target.roles %}<span class="badge">admin</span>{% endif %}
-        {% if not target.enabled %}<span class="badge">disabled</span>{% endif %}
+        {% if not target.enabled %}<span class="badge warn">disabled</span>{% elseif target.isLocked(now) %}<span class="badge warn">locked</span>{% endif %}
     </h1>
-    <p class="sub">User id <span class="expr">{{ target.externalUserId }}</span> ·
-        {% if target.domain %}domain <a href="{{ path('app_admin_domain', {code: target.domain.code}) }}" class="expr">{{ target.domain.path }}</a>{% else %}no domain{% endif %}
-        · two-factor {{ target.totpAuthenticationEnabled ? 'enabled' : 'not enabled' }}</p>
+
+    <div class="columns">
+        <section>
+            <h2>Account</h2>
+            <dl>
+                <dt>User id</dt><dd class="expr">{{ target.externalUserId }}</dd>
+                <dt>E-mail</dt><dd>{{ target.email ?? '—' }}</dd>
+                <dt>Domain</dt><dd>{% if target.domain %}<a href="{{ path('app_admin_domain', {code: target.domain.code}) }}" class="expr">{{ target.domain.path }}</a>{% else %}—{% endif %}</dd>
+                <dt>Two-factor</dt><dd>{% if target.totpEnabledAt %}<span class="badge ok">enabled</span> since {{ target.totpEnabledAt|date('Y-m-d') }}{% else %}<span class="badge warn">not enabled</span>{% if target.twoFactorPostponeCount > 0 %} · postponed {{ target.twoFactorPostponeCount }} time(s){% endif %}{% endif %}</dd>
+                <dt>Status</dt><dd>{% if not target.enabled %}disabled{% elseif target.isLocked(now) %}locked until {{ target.lockedUntil|date('H:i') }} (too many failed sign-ins){% else %}active{% endif %}</dd>
+                <dt>Last sign-in</dt><dd>{{ target.lastLoginAt ? target.lastLoginAt|date('Y-m-d H:i') : 'never' }}</dd>
+                <dt>Created</dt><dd>{{ target.createdAt|date('Y-m-d') }}</dd>
+                {% if target.passwordLinkExpiresAt and target.passwordLinkExpiresAt > now %}<dt>Password link</dt><dd>pending, valid until {{ target.passwordLinkExpiresAt|date('Y-m-d H:i') }}</dd>{% endif %}
+            </dl>
+        </section>
+        <section>
+            {% if account_denial %}
+                <h2>Manage</h2>
+                <p class="help">{{ account_denial }}</p>
+            {% else %}
+                <h2>Edit</h2>
+                <form method="post" action="{{ path('app_admin_user_identity', {id: target.id}) }}">
+                    <label for="a-username">Username</label>
+                    <input type="text" id="a-username" name="username" value="{{ target.username }}" required>
+                    <label for="a-email">E-mail address</label>
+                    <input type="email" id="a-email" name="email" value="{{ target.email }}">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user') }}">
+                    <button type="submit" class="secondary">Save</button>
+                </form>
+
+                <h3>Password</h3>
+                <form method="post" action="{{ path('app_admin_user_password_link', {id: target.id}) }}">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user') }}">
+                    <button type="submit" class="secondary" {{ target.email and target.enabled ? '' : 'disabled' }}>Send a password link</button>
+                    <p class="help">{{ target.email ? 'E-mails ' ~ target.email ~ ' a link to choose a new password. Nobody else ever sees the password.' : 'Add an e-mail address first.' }}</p>
+                </form>
+
+                {% if target.totpEnabledAt %}
+                    <h3>Two-factor</h3>
+                    <form method="post" action="{{ path('app_admin_user_2fa_reset', {id: target.id}) }}">
+                        <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user') }}">
+                        <button type="submit" class="secondary">Reset two-factor authentication</button>
+                        <p class="help">For a lost phone: the user sets it up again at his next sign-in. Check who is asking first.</p>
+                    </form>
+                {% endif %}
+            {% endif %}
+        </section>
+    </div>
 
     {% if impersonation_mode %}
         <h2>Impersonate</h2>
@@ -107,5 +153,30 @@
             <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user') }}">
             <button type="submit" class="secondary">Save</button>
         </form>
+    {% endif %}
+
+    {% if not account_denial %}
+        <section class="danger">
+            <h2>Status and deletion</h2>
+            <form method="post" action="{{ path('app_admin_user_status', {id: target.id}) }}">
+                <input type="hidden" name="enabled" value="{{ target.enabled ? 0 : 1 }}">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user') }}">
+                {% if target.enabled %}
+                    <button type="submit" class="danger">Disable the account</button>
+                    <p class="help">The user can no longer sign in and the applications can no longer renew his tokens. Can be undone.</p>
+                {% else %}
+                    <button type="submit">Enable the account</button>
+                {% endif %}
+            </form>
+            <form method="post" action="{{ path('app_admin_user_delete', {id: target.id}) }}">
+                <div class="row">
+                    <div class="grow"><label for="confirm-delete">To delete the account for good, type its username ({{ target.username }})</label>
+                        <input type="text" id="confirm-delete" name="confirm" autocomplete="off" required></div>
+                    <div><button type="submit" class="danger">Delete the account</button></div>
+                </div>
+                <p class="help">Removes the account, its rights and its impersonation history. Cannot be undone: prefer disabling.</p>
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user') }}">
+            </form>
+        </section>
     {% endif %}
 {% endblock %}

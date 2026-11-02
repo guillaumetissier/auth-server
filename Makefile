@@ -27,8 +27,8 @@ down: ## Stop the stack
 logs: ## Follow the auth server logs
 	$(COMPOSE) logs -f auth-server
 
-user: ## Create a user: make user USERNAME=alice EXTERNAL_ID=42
-	$(CONSOLE) app:user:create $(USERNAME) $(EXTERNAL_ID)
+user: ## Create a user: make user USERNAME=alice EXTERNAL_ID=42 [EMAIL=alice@example.com]
+	$(CONSOLE) app:user:create $(USERNAME) $(EXTERNAL_ID) $(if $(EMAIL),--email=$(EMAIL))
 
 import: ## Import existing users: make import FILE=users.csv (username,external_user_id,password_hash; FLAG=--dry-run)
 	$(COMPOSE) cp $(FILE) auth-server:/tmp/users-import.csv

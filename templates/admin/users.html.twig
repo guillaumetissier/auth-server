@@ -3,26 +3,33 @@
 {% block title %}Users{% endblock %}
 
 {% block content %}
-    <h1>Users</h1>
+    <div class="row" style="align-items: center">
+        <div class="grow"><h1>Users</h1></div>
+        {% if can_create %}<div style="flex: 0 0 auto"><a class="button" href="{{ path('app_admin_user_new') }}">New user</a></div>{% endif %}
+    </div>
     <form method="get">
         <div class="row">
-            <div class="grow"><label for="q">Username or user id</label><input type="text" id="q" name="q" value="{{ query }}" autofocus></div>
+            <div class="grow"><label for="q">Username, e-mail or user id</label><input type="text" id="q" name="q" value="{{ query }}" autofocus></div>
             <div><button type="submit" class="secondary">Search</button></div>
         </div>
     </form>
 
     <table style="margin-top: 16px">
-        <thead><tr><th>Username</th><th>User id</th><th>Domain</th><th>Role</th></tr></thead>
+        <thead><tr><th>Username</th><th>E-mail</th><th>User id</th><th>Domain</th><th>Two-factor</th><th>Status</th><th>Last sign-in</th></tr></thead>
         <tbody>
         {% for u in users %}
             <tr>
-                <td><a href="{{ path('app_admin_user', {id: u.id}) }}">{{ u.username }}</a></td>
+                <td><a href="{{ path('app_admin_user', {id: u.id}) }}">{{ u.username }}</a>
+                    {% if 'ROLE_SUPER_ADMIN' in u.roles %}<span class="badge">super-admin</span>{% elseif 'ROLE_ADMIN' in u.roles %}<span class="badge">admin</span>{% endif %}</td>
+                <td>{{ u.email ?? '—' }}</td>
                 <td class="expr">{{ u.externalUserId }}</td>
                 <td class="expr">{{ u.domain ? u.domain.path : '—' }}</td>
-                <td>{% if 'ROLE_SUPER_ADMIN' in u.roles %}super-admin{% elseif 'ROLE_ADMIN' in u.roles %}admin{% endif %}</td>
+                <td>{% if u.totpEnabledAt %}<span class="badge ok">on</span>{% else %}<span class="badge warn">off</span>{% endif %}</td>
+                <td>{% if not u.enabled %}<span class="badge warn">disabled</span>{% elseif u.isLocked(now) %}<span class="badge warn">locked</span>{% else %}active{% endif %}</td>
+                <td>{{ u.lastLoginAt ? u.lastLoginAt|date('Y-m-d H:i') : '—' }}</td>
             </tr>
         {% else %}
-            <tr><td colspan="4" class="muted">No user found.</td></tr>
+            <tr><td colspan="7" class="muted">No user found.</td></tr>
         {% endfor %}
         </tbody>
     </table>

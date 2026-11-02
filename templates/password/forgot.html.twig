@@ -1,0 +1,21 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Forgot your password?{% endblock %}
+
+{% block body %}
+    <h1>Forgot your password?</h1>
+    {% if sent %}
+        <div class="alert ok" role="status">If an account matches, an e-mail with a link to choose a new password is on its way.
+            The link works once, for a limited time.</div>
+        <p class="sub">Nothing after a few minutes? Check your spam folder, or ask an administrator: the account may have no e-mail address.</p>
+    {% else %}
+        <p class="sub">Give your username or your e-mail address. We send a link to choose a new password to the e-mail address of the account.</p>
+        <form method="post">
+            <label for="identifier">Username or e-mail address</label>
+            <input type="text" id="identifier" name="identifier" autocomplete="username" required autofocus>
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('password_forgot') }}">
+            <button type="submit">Send the link</button>
+        </form>
+    {% endif %}
+    <p class="links"><a href="{{ path('app_login') }}">Back to sign in</a></p>
+{% endblock %}

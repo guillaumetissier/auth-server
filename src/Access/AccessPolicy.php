@@ -40,9 +40,12 @@ final readonly class AccessPolicy
         return $actor->hasRole(User::ROLE_SUPER_ADMIN);
     }
 
+    /**
+     * Platform administrators: ROLE_ADMIN, and the super-administrator (who may hold ROLE_SUPER_ADMIN alone).
+     */
     public function isPlatformStaff(User $actor): bool
     {
-        return $actor->hasRole(User::ROLE_ADMIN);
+        return $actor->isAdministrator();
     }
 
     /**
@@ -231,6 +234,98 @@ final readonly class AccessPolicy
         }
         if (null === $domain || !$this->levelOn($actor, '@access', $domain)->includes(AccessLevel::Write)) {
             return 'You are not allowed to move users to this domain.';
+        }
+
+        return null;
+    }
+
+    /**
+     * Domains $actor may create users in (and move users to): those where he holds @access:w.
+     * The super-administrator may also create users outside any domain.
+     *
+     * @return list<Domain>
+     */
+    public function userDomainsFor(User $actor): array
+    {
+        if ($this->isSuperAdmin($actor)) {
+            return $this->domains->subtree();
+        }
+        $root = $actor->getDomain();
+
+        return null === $root ? [] : array_values(array_filter(
+            $this->domains->subtree($root),
+            fn (Domain $d): bool => $this->levelOn($actor, '@access', $d)->includes(AccessLevel::Write),
+        ));
+    }
+
+    public function canCreateUsers(User $actor): bool
+    {
+        return $this->isSuperAdmin($actor) || [] !== $this->userDomainsFor($actor);
+    }
+
+    /**
+     * Account changes made by someone else: identity, password link, 2FA reset, disabling, deletion.
+     * Same bounds as for rights; one's own account is changed from the profile page.
+     *
+     * @return string|null why $actor may not change the account of $target, null when allowed
+     */
+    public function accountChangeDenial(User $actor, User $target): ?string
+    {
+        if ($actor->getId() === $target->getId()) {
+            return 'This is your own account: change it from your profile page.';
+        }
+        if ($target->hasRole(User::ROLE_SUPER_ADMIN)) {
+            return 'The super-administrator account is changed by its holder only.';
+        }
+        if ($this->isSuperAdmin($actor)) {
+            return null;
+        }
+        if ($this->isPlatformStaff($actor)) {
+            return 'Platform administrators see the accounts but do not change them: ask the super-administrator.';
+        }
+        if ($this->isPlatformStaff($target)) {
+            return 'Only the super-administrator can change the accounts of platform administrators.';
+        }
+        $domain = $target->getDomain();
+        if (null === $domain || !$this->levelOn($actor, '@access', $domain)->includes(AccessLevel::Write)) {
+            return 'You are not allowed to manage this account.';
+        }
+        if ($this->isAboveOrOwnerOf($target, $actor)) {
+            return 'You cannot manage the account of the owner of your domain.';
+        }
+
+        return null;
+    }
+
+    /**
+     * @return string|null why $actor may not rename $domain, null when allowed
+     */
+    public function domainRenameDenial(User $actor, Domain $domain): ?string
+    {
+        if ($this->isSuperAdmin($actor)) {
+            return null;
+        }
+        $parent = $domain->getParent();
+        if (null === $parent || !$this->levelOn($actor, '@domain', $parent)->includes(AccessLevel::Write)) {
+            return 'Only who manages the parent domain can rename this domain.';
+        }
+
+        return null;
+    }
+
+    /**
+     * @return string|null why $actor may not delete $domain, null when allowed
+     */
+    public function domainDeleteDenial(User $actor, Domain $domain, int $members, int $subdomains): ?string
+    {
+        if (null !== ($denial = $this->domainRenameDenial($actor, $domain))) {
+            return str_replace('rename', 'delete', $denial);
+        }
+        if ($subdomains > 0) {
+            return \sprintf('The domain has %d subdomain(s): delete or move them first.', $subdomains);
+        }
+        if ($members > 0) {
+            return \sprintf('The domain has %d user(s): move them to another domain first.', $members);
         }
 
         return null;

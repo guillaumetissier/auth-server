@@ -1,42 +1,90 @@
-{% extends 'base.html.twig' %}
+{% extends '_app.html.twig' %}
 
-{% block title %}Account{% endblock %}
+{% block title %}My profile{% endblock %}
 
-{% block body %}
-    <h1>{{ user.username }}</h1>
-    <p class="sub">You are signed in.</p>
+{% block content %}
+    <h1>My profile</h1>
 
-    <dl>
-        <dt>Two-factor</dt>
-        <dd>{{ user.totpAuthenticationEnabled ? 'Enabled since ' ~ user.totpEnabledAt|date('Y-m-d') : 'Not enabled' }}</dd>
-        {% if user.totpAuthenticationEnabled %}
-            <dt>Backup codes</dt>
-            <dd>{{ user.countBackupCodes }} left</dd>
-        {% endif %}
-    </dl>
+    <div class="columns">
+        <section>
+            <h2>Account</h2>
+            <dl>
+                <dt>Username</dt><dd><strong>{{ user.username }}</strong></dd>
+                <dt>User id</dt><dd class="expr">{{ user.externalUserId }}</dd>
+                <dt>E-mail</dt><dd>{{ user.email ?? '—' }}</dd>
+                <dt>Domain</dt><dd class="expr">{{ user.domain ? user.domain.path : '—' }}</dd>
+                <dt>Role</dt><dd>{% if 'ROLE_SUPER_ADMIN' in user.roles %}super-administrator{% elseif 'ROLE_ADMIN' in user.roles %}platform administrator{% else %}user{% endif %}</dd>
+                <dt>Member since</dt><dd>{{ user.createdAt|date('Y-m-d') }}</dd>
+            </dl>
+            <p class="help">To change your username, ask an administrator.</p>
 
+            <h3>E-mail address</h3>
+            <form method="post" action="{{ path('app_account_email') }}">
+                <label for="email">E-mail address (where password links are sent)</label>
+                <input type="email" id="email" name="email" value="{{ user.email }}" autocomplete="email">
+                <label for="email-password">Current password</label>
+                <input type="password" id="email-password" name="current_password" autocomplete="current-password" required>
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('account_email') }}">
+                <button type="submit" class="secondary">Save the e-mail address</button>
+            </form>
+        </section>
+
+        <section>
+            <h2>Password</h2>
+            <form method="post" action="{{ path('app_account_password') }}">
+                <input type="text" name="username" value="{{ user.username }}" autocomplete="username" hidden>
+                <label for="current-password">Current password</label>
+                <input type="password" id="current-password" name="current_password" autocomplete="current-password" required>
+                <label for="new-password">New password (at least {{ min_length }} characters)</label>
+                <input type="password" id="new-password" name="password" minlength="{{ min_length }}" autocomplete="new-password" required>
+                <label for="new-password-2">New password again</label>
+                <input type="password" id="new-password-2" name="confirmation" minlength="{{ min_length }}" autocomplete="new-password" required>
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('account_password') }}">
+                <button type="submit">Change the password</button>
+            </form>
+            <p class="help">Your applications will have to sign you in again.</p>
+        </section>
+    </div>
+
+    <h2>Two-factor authentication
+        {% if user.totpAuthenticationEnabled %}<span class="badge ok">enabled</span>{% else %}<span class="badge warn">not enabled</span>{% endif %}</h2>
     {% if not user.totpAuthenticationEnabled %}
+        <p class="help">After your password, a 6-digit code from an app on your phone (Google Authenticator, Microsoft Authenticator, 2FAS…).</p>
         <a class="button" href="{{ path('app_2fa_setup') }}">Set up two-factor authentication</a>
     {% else %}
-        <form method="post" action="{{ path('app_2fa_backup_codes_regenerate') }}">
-            <label for="code-regen">Current code (to confirm)</label>
-            <input type="text" id="code-regen" name="code" class="code" inputmode="numeric" maxlength="6" required autocomplete="one-time-code">
-            <input type="hidden" name="_csrf_token" value="{{ csrf_token('totp_manage') }}">
-            <button type="submit" class="secondary">Generate new backup codes</button>
-        </form>
-        {% if can_disable %}
-            <form method="post" action="{{ path('app_2fa_disable') }}">
-                <label for="code-disable">Current code (to confirm)</label>
-                <input type="text" id="code-disable" name="code" class="code" inputmode="numeric" maxlength="6" required autocomplete="one-time-code">
+        <p>Enabled since {{ user.totpEnabledAt|date('Y-m-d') }} · {{ user.countBackupCodes }} backup code(s) left.</p>
+        <div class="columns">
+            <form method="post" action="{{ path('app_2fa_backup_codes_regenerate') }}">
+                <label for="code-regen">Current code (to confirm)</label>
+                <input type="text" id="code-regen" name="code" class="code" inputmode="numeric" maxlength="6" required autocomplete="one-time-code">
                 <input type="hidden" name="_csrf_token" value="{{ csrf_token('totp_manage') }}">
-                <button type="submit" class="secondary">Disable two-factor authentication</button>
+                <button type="submit" class="secondary">Generate new backup codes</button>
             </form>
-        {% endif %}
+            {% if can_disable %}
+                <form method="post" action="{{ path('app_2fa_disable') }}">
+                    <label for="code-disable">Current code (to confirm)</label>
+                    <input type="text" id="code-disable" name="code" class="code" inputmode="numeric" maxlength="6" required autocomplete="one-time-code">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('totp_manage') }}">
+                    <button type="submit" class="secondary">Disable two-factor authentication</button>
+                </form>
+            {% endif %}
+        </div>
     {% endif %}
 
+    <h2>My rights</h2>
+    {% if grants is empty %}
+        <p class="muted">No rights granted to you directly.</p>
+    {% else %}
+        <table>
+            <thead><tr><th>Domain</th><th>Subdomains</th><th>Rights</th></tr></thead>
+            <tbody>
+            {% for g in grants %}
+                <tr><td class="expr">{{ g.domain.path }}</td><td>{{ g.includesSubdomains ? 'yes' : 'no' }}</td><td class="expr">{{ g.expression }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
     {% if can_administer %}
-        <a class="button" href="{{ path('app_admin_domains') }}">Users and rights</a>
+        <p class="help">You can administer users and domains: see <a href="{{ path('app_admin_users') }}">Users</a> and <a href="{{ path('app_admin_domains') }}">Domains</a>.</p>
     {% endif %}
-
-    <p class="links"><a href="{{ path('app_logout') }}">Sign out</a></p>
 {% endblock %}

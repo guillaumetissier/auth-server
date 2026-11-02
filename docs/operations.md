@@ -7,7 +7,7 @@ Run them from the project folder, with the stack started.
 | Command | Purpose |
 |---|---|
 | `make help` | Lists every command |
-| `make user USERNAME=… EXTERNAL_ID=…` | Creates a user (asks for the password) |
+| `make user USERNAME=… EXTERNAL_ID=… [EMAIL=…]` | Creates a user (asks for the password). In the browser: **Users → New user**, which e-mails an invitation instead |
 | `make import FILE=users.csv` | Imports existing users, see [Migrating existing users](migrating-users.md) |
 | `make role USERNAME=… ROLE=ROLE_ADMIN` | Platform roles (`FLAG=--remove`, `FLAG=--transfer` for the super-administrator) |
 | `make client ID=… REDIRECT=…` | Registers an application |

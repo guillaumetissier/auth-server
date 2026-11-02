@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Access\AccessPolicy;
+use App\Access\AccessResolver;
+use App\Account\AccountManager;
+use App\Account\PasswordRules;
 use App\Entity\User;
 use App\Event\AccountEvent;
 use App\OAuth\AuthorizationRequestListener;
@@ -16,13 +19,14 @@ use Psr\Clock\ClockInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsCsrfTokenValid;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 /**
- * Minimal self-service: TOTP enrollment (or postponing it during the grace period), backup codes,
- * disabling 2FA when the policy allows it.
+ * The user's own profile: e-mail address, password, TOTP enrollment (or postponing it during the
+ * grace period), backup codes, disabling 2FA when the policy allows it, domain and rights.
  */
 #[Route('/account')]
 final class AccountController extends AbstractController
@@ -37,17 +41,71 @@ final class AccountController extends AbstractController
         private readonly EventDispatcherInterface $dispatcher,
         private readonly ClockInterface $clock,
         private readonly AccessPolicy $accessPolicy,
+        private readonly AccessResolver $resolver,
+        private readonly AccountManager $accounts,
+        private readonly UserPasswordHasherInterface $hasher,
     ) {
     }
 
     #[Route('', name: 'app_account', methods: ['GET'])]
     public function index(): Response
     {
+        $user = $this->user();
+
         return SecurityController::harden($this->render('account/index.html.twig', [
-            'user' => $user = $this->user(),
+            'user' => $user,
             'can_disable' => $this->twoFactorPolicy->canDisable($user),
             'can_administer' => $this->accessPolicy->canAdminister($user),
+            'grants' => $this->resolver->grantsOf($user),
+            'min_length' => PasswordRules::MIN_LENGTH,
         ]));
+    }
+
+    /**
+     * Changing the e-mail address requires the current password: it is where password links go.
+     */
+    #[Route('/email', name: 'app_account_email', methods: ['POST'])]
+    #[IsCsrfTokenValid('account_email', tokenKey: '_csrf_token')]
+    public function email(Request $request): Response
+    {
+        $user = $this->user();
+        $email = trim($request->request->getString('email'));
+        $email = '' === $email ? null : mb_strtolower($email);
+
+        if (!$this->hasher->isPasswordValid($user, $request->request->getString('current_password'))) {
+            $this->addFlash('error', 'Your current password is not correct.');
+        } elseif (null !== ($problem = $this->accounts->identityProblem($user->getUsername(), $email, $user))) {
+            $this->addFlash('error', $problem);
+        } else {
+            $this->accounts->updateIdentity($user, $user->getUsername(), $email, $user);
+            $this->addFlash('success', null === $email ? 'E-mail address removed.' : 'E-mail address saved.');
+        }
+
+        return $this->redirectToRoute('app_account');
+    }
+
+    /**
+     * Your other sessions end, and the applications must sign you in again.
+     */
+    #[Route('/password', name: 'app_account_password', methods: ['POST'])]
+    #[IsCsrfTokenValid('account_password', tokenKey: '_csrf_token')]
+    public function password(Request $request): Response
+    {
+        $user = $this->user();
+        $password = $request->request->getString('password');
+
+        if (!$this->hasher->isPasswordValid($user, $request->request->getString('current_password'))) {
+            $this->addFlash('error', 'Your current password is not correct.');
+        } elseif (null !== ($problem = PasswordRules::problem($password, $request->request->getString('confirmation')))) {
+            $this->addFlash('error', $problem);
+        } else {
+            $this->accounts->changePassword($user, $password, $user);
+            // Keep this session: the stored hash changed, so refresh the authenticated user.
+            $this->container->get('security.token_storage')->getToken()?->setUser($user);
+            $this->addFlash('success', 'Password changed. Sign in again in your applications.');
+        }
+
+        return $this->redirectToRoute('app_account');
     }
 
     #[Route('/2fa/setup', name: 'app_2fa_setup', methods: ['GET', 'POST'])]

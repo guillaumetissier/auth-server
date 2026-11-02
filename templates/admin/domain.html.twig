@@ -7,7 +7,18 @@
         {% for a in ancestors %}<a href="{{ path('app_admin_domain', {code: a.code}) }}">{{ a.code }}</a> / {% endfor %}
     </p>
     <h1>{{ domain.name }} <span class="badge">{{ domain.code }}</span></h1>
-    <p class="sub expr">{{ domain.path }}</p>
+    <p class="sub expr">{{ domain.path }} · created {{ domain.createdAt|date('Y-m-d') }}</p>
+
+    {% if not rename_denial %}
+        <form method="post" action="{{ path('app_admin_domain_rename', {code: domain.code}) }}">
+            <div class="row">
+                <div class="grow"><label for="d-name">Name</label><input type="text" id="d-name" name="name" value="{{ domain.name }}" required maxlength="255"></div>
+                <div><button type="submit" class="secondary">Rename</button></div>
+            </div>
+            <p class="help">The code <code>{{ domain.code }}</code> and the path never change: applications store them with their resources.</p>
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_domain') }}">
+        </form>
+    {% endif %}
 
     <h2>Owner</h2>
     <p class="help">The owner is the super user of the domain: he holds the owner rights on this domain and all its subdomains.
@@ -65,6 +76,9 @@
                 </tbody>
             </table>
         {% endif %}
+        {% if can_create_users %}
+            <p><a class="button secondary" href="{{ path('app_admin_user_new', {domain: domain.code}) }}">New user in this domain</a></p>
+        {% endif %}
         {% if can_add_members %}
             <form method="post" action="{{ path('app_admin_domain_member', {code: domain.code}) }}">
                 <div class="row">
@@ -74,5 +88,24 @@
                 <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_domain') }}">
             </form>
         {% endif %}
+    {% endif %}
+
+    {% if not rename_denial %}
+        <section class="danger">
+            <h2>Delete the domain</h2>
+            {% if delete_denial %}
+                <p class="help">{{ delete_denial }}</p>
+            {% else %}
+                <form method="post" action="{{ path('app_admin_domain_delete', {code: domain.code}) }}">
+                    <div class="row">
+                        <div class="grow"><label for="confirm-domain">Type the code of the domain ({{ domain.code }}) to confirm</label>
+                            <input type="text" id="confirm-domain" name="confirm" autocomplete="off" required></div>
+                        <div><button type="submit" class="danger">Delete</button></div>
+                    </div>
+                    <p class="help">The rights granted on this domain are removed with it.</p>
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_domain') }}">
+                </form>
+            {% endif %}
+        </section>
     {% endif %}
 {% endblock %}

@@ -1,0 +1,25 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Choose a password{% endblock %}
+
+{% block body %}
+    {% if user is null %}
+        <h1>Link not valid</h1>
+        <p class="sub">This link has expired or was already used. Ask for a new one.</p>
+        <a class="button" href="{{ path('app_password_forgot') }}">Ask for a new link</a>
+    {% else %}
+        <h1>Choose a password</h1>
+        <p class="sub">For the account <strong>{{ user.username }}</strong>. At least {{ min_length }} characters: a sentence of a few words is easy to remember and hard to guess.</p>
+        {% if error %}<div class="alert error" role="alert">{{ error }}</div>{% endif %}
+        <form method="post">
+            {# Lets password managers save the password for the right account. #}
+            <input type="text" name="username" value="{{ user.username }}" autocomplete="username" hidden>
+            <label for="password">New password</label>
+            <input type="password" id="password" name="password" minlength="{{ min_length }}" autocomplete="new-password" required autofocus>
+            <label for="confirmation">New password again</label>
+            <input type="password" id="confirmation" name="confirmation" minlength="{{ min_length }}" autocomplete="new-password" required>
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('password_set') }}">
+            <button type="submit">Save the password</button>
+        </form>
+    {% endif %}
+{% endblock %}

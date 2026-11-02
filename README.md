@@ -127,11 +127,16 @@ The first time, this downloads and builds everything: **allow 3 to 10 minutes**.
 when the server is ready and ends with lines such as:
 
 ```
+ ✔ Container auth-server-mailpit-1      Healthy
  ✔ Container auth-server-auth-db-1      Healthy
  ✔ Container auth-server-auth-server-1  Healthy
 ```
 
 At its first start the server creates its signing keys and its database tables by itself.
+
+Three containers run: the server, its MySQL database, and **Mailpit**, which catches the e-mails the
+server sends (password links) so that you can read them at <http://localhost:8025> without a real mail
+server.
 
 ### 3.4 Check that it answers
 
@@ -156,22 +161,25 @@ make client ID=my-spa REDIRECT=http://localhost:5173/callback
 ### 3.6 Create a user
 
 ```bash
-make user USERNAME=alice EXTERNAL_ID=42
+make user USERNAME=alice EXTERNAL_ID=42 EMAIL=alice@example.com
 ```
 
 You are asked for a password (at least 12 characters). Nothing is displayed while you type: this is
 normal. Expected: `[OK] User "alice" created (sub = 42).`
 
+`EMAIL` is optional; it is where "Forgot your password?" links are sent. In development, they arrive in
+Mailpit (<http://localhost:8025>), whatever the address.
+
 ### 3.7 Sign in
 
 1. Open <http://localhost:8080/login> in your browser.
 2. Enter `alice` and her password, click **Continue**.
-3. You arrive on the **account page**, showing `alice`. From there you can set up two-factor
-   authentication (next step) and sign out.
+3. You arrive on the **dashboard**. It warns that two-factor authentication is not enabled yet.
+   The navigation bar leads to **My profile** (e-mail address, password, two-factor authentication).
 
 ### 3.8 Set up two-factor authentication
 
-1. On the account page, click **Set up two-factor authentication**.
+1. On the dashboard, click **Set it up** (or, on **My profile**, **Set up two-factor authentication**).
 2. On your phone, open your authenticator app, choose "add an account", and scan the QR code shown on
    the page (or type the secret displayed under it, without the spaces).
 3. Type the 6-digit code shown by the app and click **Activate**.
@@ -230,8 +238,8 @@ Administrators manage users and rights in the browser, and can impersonate users
 make role USERNAME=alice ROLE=ROLE_SUPER_ADMIN
 ```
 
-Sign out and in again: the account page now has a **Users and rights** button, which opens the
-administration pages (<http://localhost:8080/admin>). See [Using the application](#6-using-the-application).
+Sign out and in again: the navigation bar now shows **Users**, **Domains** and **Resource types**, and
+the dashboard shows figures about the accounts. See [Using the application](#6-using-the-application).
 
 You now have a working auth server. To connect a real application, go to
 [For developers](#for-developers-connecting-an-application).
@@ -248,6 +256,7 @@ Run these from the `auth-server` folder.
 | Start it again | `make up` |
 | See what the server writes (errors, requests); Ctrl+C to stop watching | `make logs` |
 | See if it runs | `docker compose ps` |
+| Read the e-mails the server sent (development) | open <http://localhost:8025> |
 | Apply a change made in `.env.docker` | `docker compose up -d` |
 | List every `make` command | `make help` |
 | **Delete everything** (users, clients, keys) and start from zero | `docker compose down -v`, then `make up` |
@@ -268,6 +277,9 @@ Run these from the `auth-server` folder.
 | The 6-digit code is refused | Check the time of the phone and of the computer (automatic time on both). Each code works once. |
 | `token` answers `invalid_grant` | The code is older than 5 minutes or was already used: start again from `authorize-url`. |
 | `composer install` complains about a missing `ext-…` | Install the matching PHP package, e.g. `ext-pdo_mysql` → `php8.3-mysql`, `ext-pdo_sqlite` → `php8.3-sqlite3`. |
+| "Forgot your password?" sends nothing | The account has no e-mail address (an administrator adds it on the user's page), or the e-mail failed: `make logs` shows `password_link.send_failed` and the reason. In development the e-mails are in <http://localhost:8025>. |
+| "The e-mail could not be sent" when creating a user | `MAILER_DSN` in `.env.docker` is wrong or the mail server refuses the connection. Fix it, `docker compose up -d`, then **Send a password link** on the user's page. |
+| `container auth-server-auth-server-1 is unhealthy`, and `make logs` says `Cache directory … cannot be created` | The disk is full (`df -h`). Free space (`docker system prune`, `docker builder prune`), then `docker compose up -d --force-recreate`. |
 | Anything else | `make logs` shows the error. |
 
 ---
@@ -316,6 +328,17 @@ TOTP_ISSUER="Example Inc."
 - `TRUSTED_PROXIES=PRIVATE_SUBNETS`: tells the server that requests come through the HTTPS proxy of step 5.5.
 - `CORS_ALLOWED_ORIGINS`: the addresses of your browser applications, comma-separated.
 - `TOTP_ISSUER`: the name users will see in their authenticator app.
+
+Then the e-mails (password links). Give the address of your mail server, as your mail provider
+documents it (host, port, user, password), and the sender address:
+
+```dotenv
+MAILER_DSN=smtp://user:password@smtp.example.com:587
+MAILER_FROM_ADDRESS=no-reply@example.com
+MAILER_FROM_NAME="Example Inc."
+```
+
+Special characters in the password must be URL-encoded (`@` becomes `%40`, `/` becomes `%2F`).
 
 Optionally, choose the 2FA policy (`APP_2FA_MODE`) and webhooks (`WEBHOOK_URLS`): see
 [Configuration](docs/configuration.md).
@@ -377,14 +400,19 @@ closed port 80).
 ### 5.7 Create the first accounts
 
 ```bash
-make user USERNAME=admin EXTERNAL_ID=1
+make user USERNAME=admin EXTERNAL_ID=1 EMAIL=you@example.com
 make role USERNAME=admin ROLE=ROLE_SUPER_ADMIN
 make client ID=my-app REDIRECT=https://app.example.com/callback
 ```
 
 Sign in at `https://auth.example.com/login` and set up two-factor authentication at once (step 3.8):
-administrators need it. To bring existing users with their current passwords, see
+administrators need it. Then create the other accounts from **Users → New user**: each person receives
+an e-mail to choose his password. Check that the e-mails arrive with your own address first ("Forgot your
+password?" on the sign-in page). To bring existing users with their current passwords, see
 [Migrating existing users](docs/migrating-users.md).
+
+The Mailpit container also runs in production, but receives nothing once `MAILER_DSN` points to your
+mail server; it is reachable from the server itself only. `docker compose stop mailpit` stops it.
 
 ### 5.8 Schedule the clean-up
 
@@ -419,36 +447,59 @@ Have a monitoring service call `https://auth.example.com/health` every minute: i
 
 ## 6. Using the application
 
+After signing in at `/login`, everyone arrives on the **dashboard**. The navigation bar at the top leads
+to the other pages.
+
 ### For users
 
-| Page | Address | What for |
-|---|---|---|
-| Sign in | `/login` | Username, password, then the 6-digit code (or one backup code). Users usually arrive here through an application. |
-| Account | `/account` | Set up or (when allowed) disable two-factor authentication, generate new backup codes, sign out. |
+| Page | What for |
+|---|---|
+| **Sign in** (`/login`) | Username, password, then the 6-digit code (or one backup code). Users usually arrive here through an application. |
+| **Forgot your password?** (link on the sign-in page) | Give your username or e-mail address: a link to choose a new password is e-mailed to the address of the account. It works once, for 1 hour. |
+| **Dashboard** (`/dashboard`) | Notifications: two-factor authentication not enabled, few backup codes left, no e-mail address. |
+| **My profile** (`/account`) | Your account; change your e-mail address and your password; set up two-factor authentication, generate new backup codes, or disable 2FA when the policy allows it; your rights. |
 
-- **New phone**: sign in with a backup code, then on the account page disable and set up 2FA again
-  (if disabling is not allowed, ask an administrator).
-- **Lost phone and backup codes**: there is no recovery page yet; keep the backup codes in a safe place.
+- **New phone**: sign in with a backup code, then on **My profile** disable and set up 2FA again
+  (if disabling is not allowed, ask an administrator to reset it).
+- **Lost phone and backup codes**: an administrator resets your two-factor authentication.
 - **Too many failed attempts**: wait 15 minutes; after 10 failures the account is locked for 30 minutes.
+  A new password (through a password link) unlocks it.
+- **Changing the password** ends your other sessions, and your applications must sign you in again.
 
 ### For administrators
 
-Users with a platform role, or with management rights on a domain, see a **Users and rights** button on
-their account page. It opens `/admin`:
+Who administers what:
 
-- **Users**: list and search; each user's page shows his domain, rights and roles, and lets you change
-  them (super-administrator, or domain managers within their own rights).
-- **Domains**: the tree of organisations, their members and owners.
-- **Resource types**: the kinds of objects rights apply to (vehicles, invoices, …).
-- **Impersonate in …** button: act as a user in an application, after giving a reason and a fresh 2FA code.
-  It appears once the application's entry point is declared, see [Impersonation](docs/impersonation.md).
+| Who | Sees | Changes |
+|---|---|---|
+| `ROLE_SUPER_ADMIN` (one account) | everything | everything: accounts, domains, rights, roles |
+| `ROLE_ADMIN` (support staff) | everything | nothing; impersonates users in read-only mode |
+| Holder of `@access:w` on a domain (e.g. its owner) | the users of that domain and its subdomains | their accounts and rights, never beyond his own rights, never the owner above him |
+| Holder of `@domain:w` on a domain | its subdomains | creates, renames and deletes its subdomains |
 
-Roles:
+They see **Users**, **Domains** and **Resource types** in the navigation bar, and figures on the
+dashboard: number of accounts, share with two-factor, locked and disabled accounts, last sign-ins, last
+domains created, for the users they administer.
 
-| Role | Can |
-|---|---|
-| `ROLE_SUPER_ADMIN` | Everything. **One** account only. |
-| `ROLE_ADMIN` | See everything, change nothing, impersonate in read-only mode. |
+**Users** (`/admin/users`): search by username, e-mail or user id; two-factor and status at a glance.
+
+- **New user**: username, user id in your application, e-mail address, domain. The person receives an
+  e-mail with a link to choose his password (valid 7 days). Then give him rights on his page.
+- On a user's page:
+  - **Edit** the username and e-mail address;
+  - **Send a password link**: he chooses a new password himself; nobody else ever knows it;
+  - **Reset two-factor authentication** (lost phone): he sets it up again at his next sign-in;
+  - **Impersonate in …**: act as him in an application, after giving a reason and a fresh 2FA code
+    (see [Impersonation](docs/impersonation.md));
+  - **Rights**: grant or remove rights per domain, and see what they give;
+  - **Disable the account** (he can no longer sign in, the applications can no longer renew his tokens;
+    can be undone) or **Delete the account** (type its username to confirm; cannot be undone).
+
+**Domains** (`/admin`): the tree, with the number of users per domain. On a domain's page: rename it,
+set its owner and owner rights, create subdomains, see and move its users, create a user in it, and
+delete it when it is empty (no user, no subdomain).
+
+Roles are given from a user's page (super-administrator) or on the command line:
 
 ```bash
 make role USERNAME=carla ROLE=ROLE_ADMIN                   # grant
@@ -456,9 +507,9 @@ make role USERNAME=carla ROLE=ROLE_ADMIN FLAG=--remove     # remove
 make role USERNAME=dave ROLE=ROLE_SUPER_ADMIN FLAG=--transfer   # hand the super-administrator role over
 ```
 
-Other administration commands (creating users, importing, 2FA roll-out follow-up, impersonation audit)
-are listed in [Operations](docs/operations.md). Domains and rights are explained in
-[Domains and rights](docs/domains-and-rights.md), impersonation in [Impersonation](docs/impersonation.md).
+Other administration commands (importing users, 2FA roll-out follow-up, impersonation audit) are listed
+in [Operations](docs/operations.md). Domains and rights are explained in
+[Domains and rights](docs/domains-and-rights.md).
 
 ### For developers: connecting an application
 

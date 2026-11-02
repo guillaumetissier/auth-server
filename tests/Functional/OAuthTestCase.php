@@ -35,6 +35,8 @@ abstract class OAuthTestCase extends WebTestCase
         self::ensureKernelShutdown();
         $this->browser = static::createClient();
         RecordingHttpClient::$requests = [];
+        // Rate limiter states (login throttling, password links) must not leak from one test to the next.
+        static::getContainer()->get('cache.rate_limiter')->clear();
 
         $em = $this->em();
         $schemaTool = new SchemaTool($em);

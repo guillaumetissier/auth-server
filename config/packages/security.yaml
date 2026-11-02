@@ -39,7 +39,7 @@ security:
                 login_path: app_login
                 check_path: app_login
                 enable_csrf: true
-                default_target_path: app_account
+                default_target_path: app_dashboard
                 username_parameter: _username
                 password_parameter: _password
             login_throttling:
@@ -59,9 +59,11 @@ security:
     access_control:
         - { path: ^/login$, roles: PUBLIC_ACCESS }
         - { path: ^/logout$, roles: PUBLIC_ACCESS }
+        - { path: ^/password/, roles: PUBLIC_ACCESS }                     # forgotten password, password links
         - { path: ^/2fa, roles: IS_AUTHENTICATED_2FA_IN_PROGRESS }
         - { path: ^/authorize, roles: IS_AUTHENTICATED_FULLY }
         - { path: ^/account, roles: IS_AUTHENTICATED_FULLY }
+        - { path: ^/dashboard$, roles: IS_AUTHENTICATED_FULLY }
         - { path: ^/impersonation/confirm, roles: IS_AUTHENTICATED_FULLY }   # ImpersonationPolicy decides
         - { path: ^/admin, roles: IS_AUTHENTICATED_FULLY }                   # AccessPolicy decides
 

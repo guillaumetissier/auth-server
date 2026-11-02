@@ -21,6 +21,22 @@ framework:
             policy: sliding_window
             limit: 50
             interval: '15 minutes'
+        # "Forgot your password?": per account, so that nobody floods a mailbox, and per IP.
+        password_link:
+            policy: sliding_window
+            limit: 5
+            interval: '15 minutes'
+        password_link_ip:
+            policy: sliding_window
+            limit: 30
+            interval: '15 minutes'
+
+    mailer:
+        dsn: '%env(MAILER_DSN)%'
+        envelope:
+            sender: '%env(MAILER_FROM_ADDRESS)%'
+        headers:
+            From: '%env(MAILER_FROM_NAME)% <%env(MAILER_FROM_ADDRESS)%>'
 
     http_client:
         default_options:

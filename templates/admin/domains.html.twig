@@ -10,15 +10,17 @@
         <p class="muted">No domain yet.</p>
     {% else %}
         <table>
-            <thead><tr><th>Domain</th><th>Name</th><th>Owner</th><th>Owner rights</th></tr></thead>
+            <thead><tr><th>Domain</th><th>Name</th><th class="num">Users</th><th>Owner</th><th>Owner rights</th><th>Created</th></tr></thead>
             <tbody>
             {% set base = domains|first.depth %}
             {% for d in domains %}
                 <tr>
                     <td><span class="tree" style="--depth: {{ d.depth - base }}"><a href="{{ path('app_admin_domain', {code: d.code}) }}">{{ d.code }}</a></span></td>
                     <td>{{ d.name }}</td>
+                    <td class="num">{{ members[d.id] ?? 0 }}</td>
                     <td>{{ d.owner ? d.owner.username : '—' }}</td>
                     <td class="expr">{{ d.ownerExpression }}</td>
+                    <td>{{ d.createdAt|date('Y-m-d') }}</td>
                 </tr>
             {% endfor %}
             </tbody>

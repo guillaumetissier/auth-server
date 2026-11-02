@@ -93,9 +93,15 @@ the receiver the same `WEBHOOK_SECRET`. Events are POSTed as JSON, signed with H
 and the body (`X-Auth-Server-Signature: t=…,v1=…`), after the response is sent. resource-guard verifies
 them and ignores redeliveries.
 
-Events: `user.created`, `user.login_succeeded`, `user.login_failed`, `user.locked`,
-`user.two_factor_enabled`, `user.two_factor_disabled`, `user.two_factor_postponed`, `user.roles_changed`,
-`user.access_changed`, `impersonation.started`, `impersonation.ended`.
+Events: `user.created`, `user.updated` (username or e-mail), `user.disabled`, `user.enabled`,
+`user.deleted`, `user.login_succeeded`, `user.login_failed`, `user.locked`, `user.password_changed`,
+`user.password_link_sent`, `user.two_factor_enabled`, `user.two_factor_disabled` (also when an
+administrator resets it), `user.two_factor_postponed`, `user.roles_changed`, `user.access_changed`,
+`impersonation.started`, `impersonation.ended`. Events caused by an administrator carry his id in
+`actor_id`.
+
+React to `user.deleted` and `user.disabled` in your application: the access tokens already issued stay
+valid until they expire (15 minutes by default).
 
 To see them while developing: `WEBHOOK_SECRET=<value from .env.docker> php -S 0.0.0.0:9000 tools/webhook-receiver.php`
 and `WEBHOOK_URLS=http://host.docker.internal:9000/`.

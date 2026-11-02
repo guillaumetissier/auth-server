@@ -29,7 +29,7 @@ echo "== Users (password: $PASSWORD)"
 for user in reader:101 manager:102 outsider:103 support:100; do
     name=${user%%:*}
     id=${user##*:}
-    run app:user:create "$name" "$id" --password="$PASSWORD" >/dev/null 2>&1 && echo "$name created" || echo "$name already exists"
+    run app:user:create "$name" "$id" --password="$PASSWORD" --email="$name@demo.test" >/dev/null 2>&1 && echo "$name created" || echo "$name already exists"
 done
 run app:user:role support ROLE_ADMIN >/dev/null 2>&1 || true
 

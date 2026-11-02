@@ -24,6 +24,10 @@ After changing `.env.docker`, apply it with `docker compose up -d` (the containe
 | `IMPERSONATION_ACCESS_TOKEN_TTL` | `PT5M` | Access token lifetime during an impersonation. |
 | `IMPERSONATION_READONLY_SCOPES` | `profile,offline_access` | Scopes kept in read-only impersonations. |
 | `ACCESS_DEFAULT_EXPRESSION` | empty | Rights every user holds on his own domain, e.g. `user:w:own`. See [Domains and rights](domains-and-rights.md). |
+| `MAILER_DSN` | `null://null` (nothing sent); Docker Compose: `smtp://mailpit:1025` | How e-mails (password links) are sent, e.g. `smtp://user:password@smtp.example.com:587`. URL-encode special characters of the password. In development, Mailpit shows them at <http://localhost:8025>. |
+| `MAILER_FROM_ADDRESS` / `MAILER_FROM_NAME` | `no-reply@localhost` / `Auth Server` | Sender of the e-mails. Use an address of your domain, allowed by your mail server. |
+| `PASSWORD_RESET_TTL` | `PT1H` | Lifetime of a password link from "Forgot your password?" or from an administrator. |
+| `PASSWORD_INVITATION_TTL` | `P7D` | Lifetime of the link a new user receives to choose his first password. |
 | `WEBHOOK_URLS` | empty | Comma-separated URLs receiving the signed account events. Empty: no webhook. |
 | `WEBHOOK_SECRET` | generated | Shared secret signing the webhooks (32 characters or more); the receiver needs the same value. |
 | `MYSQL_DATABASE`, `MYSQL_USER` | `auth` | Database name and user, created by the MySQL container on its first start. |
