@@ -14,6 +14,9 @@
             <a href="{{ path('app_admin_users') }}"{% if current starts with 'app_admin_user' %} aria-current="page"{% endif %}>Users</a>
             <a href="{{ path('app_admin_domains') }}"{% if current starts with 'app_admin_domain' %} aria-current="page"{% endif %}>Domains</a>
             <a href="{{ path('app_admin_resource_types') }}"{% if current == 'app_admin_resource_types' %} aria-current="page"{% endif %}>Resource types</a>
+            {% if is_granted('ROLE_ADMIN') or is_granted('ROLE_SUPER_ADMIN') %}
+                <a href="{{ path('app_admin_settings') }}"{% if current starts with 'app_admin_settings' %} aria-current="page"{% endif %}>Settings</a>
+            {% endif %}
         {% endif %}
         <span class="who">{{ app.user.username }}{% if app.user.domain %} · {{ app.user.domain.path }}{% endif %}
             · <a href="{{ path('app_logout') }}">Sign out</a></span>

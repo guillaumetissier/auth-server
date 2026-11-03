@@ -1,0 +1,111 @@
+{% extends 'admin/_layout.html.twig' %}
+
+{% block title %}Settings{% endblock %}
+
+{% macro source(row, default) %}
+    {% if row %}
+        <span class="help">Set by {{ row.updatedBy ? row.updatedBy.username : 'a deleted account' }} on {{ row.updatedAt|date('Y-m-d H:i') }}
+            · default of the server configuration: <code>{{ default == '' ? '(empty)' : default }}</code></span>
+    {% else %}
+        <span class="help">Default of the server configuration (.env.docker).</span>
+    {% endif %}
+{% endmacro %}
+
+{% block content %}
+    <h1>Settings</h1>
+    <p class="sub">They apply at once to the next sign-ins and token requests.
+        {% if not can_edit %}Only the super-administrator changes them.{% endif %}</p>
+
+    <form method="post" action="{{ path('app_admin_settings_save') }}">
+        <h2>Token security</h2>
+
+        <label class="check"><input type="checkbox" name="dpop_required" value="1" {{ dpop_required ? 'checked' }} {{ can_edit ? '' : 'disabled' }}>
+            Applications must use DPoP</label>
+        <p class="help">With DPoP, each token is bound to a key that never leaves the browser of the user: a stolen token is
+            useless. Without it, tokens are plain "Bearer" tokens, usable by whoever holds them. Each application can
+            follow this setting or have its own rule (below).</p>
+        {{ _self.source(rows['dpop.required_by_default'], defaults['dpop.required_by_default'] == '1' ? 'required' : 'not required') }}
+
+        <label class="check" style="margin-top: 18px"><input type="checkbox" name="pkce_confidential" value="1" {{ pkce_confidential ? 'checked' }} {{ can_edit ? '' : 'disabled' }}>
+            PKCE also for confidential applications (server-side applications with a secret)</label>
+        <p class="help">PKCE (S256) protects the sign-in code against interception. It is <strong>always required for browser and
+            mobile applications</strong> (public clients): without it, anyone intercepting the code could get the tokens.
+            For applications authenticating with a secret, OAuth 2.1 recommends it too: keep it on unless an old
+            application cannot send it.</p>
+        {{ _self.source(rows['pkce.confidential_clients'], defaults['pkce.confidential_clients'] == '1' ? 'required' : 'not required') }}
+
+        <h2>Two-factor authentication</h2>
+        <div class="row">
+            <div>
+                <label for="tf-mode">Mode</label>
+                <select id="tf-mode" name="two_factor_mode" {{ can_edit ? '' : 'disabled' }}>
+                    <option value="optional" {{ two_factor_mode == 'optional' ? 'selected' }}>Optional</option>
+                    <option value="grace" {{ two_factor_mode == 'grace' ? 'selected' }}>Grace period</option>
+                    <option value="required" {{ two_factor_mode == 'required' ? 'selected' }}>Required</option>
+                </select>
+            </div>
+            <div>
+                <label for="tf-deadline">Required from (grace period)</label>
+                <input type="date" id="tf-deadline" name="two_factor_deadline" value="{{ two_factor_deadline ? two_factor_deadline|date('Y-m-d') : '' }}" {{ can_edit ? '' : 'disabled' }}
+                       style="width: 100%; padding: 8px 10px; font: inherit; color: var(--text); background: transparent; border: 1px solid var(--border); border-radius: 8px">
+            </div>
+        </div>
+        <table style="margin-top: 12px">
+            <tbody>
+            <tr><td><strong>Optional</strong></td><td>Users set it up if they want, from their profile, and may turn it off again.</td></tr>
+            <tr><td><strong>Grace period</strong></td><td>Users without 2FA are asked at each sign-in and may click "Later" until the date
+                    above; from that date on it is required. Without a date, "Later" stays possible until you set one.</td></tr>
+            <tr><td><strong>Required</strong></td><td>Users without 2FA must set it up at their next sign-in.</td></tr>
+            </tbody>
+        </table>
+        <p class="help">Administrators always need two-factor authentication, whatever the mode.</p>
+        {{ _self.source(rows['two_factor.mode'], defaults['two_factor.mode']) }}<br>
+        {{ _self.source(rows['two_factor.deadline'], defaults['two_factor.deadline']) }}
+
+        {% if can_edit %}
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_settings') }}">
+            <div><button type="submit">Save the settings</button></div>
+        {% endif %}
+    </form>
+    {% if can_edit %}
+        <form method="post" action="{{ path('app_admin_settings_save') }}">
+            <input type="hidden" name="use_defaults" value="1">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_settings') }}">
+            <button type="submit" class="secondary">Use the defaults of the server configuration</button>
+        </form>
+    {% endif %}
+
+    <h2>Applications</h2>
+    <p class="help">The applications registered with <code>make client</code>, and their DPoP rule.</p>
+    <table>
+        <thead><tr><th>Application</th><th>Type</th><th>Redirect address</th><th>DPoP</th></tr></thead>
+        <tbody>
+        {% for c in clients %}
+            {% set p = policies[c.identifier] ?? null %}
+            {% set rule = p is null or p.requiresDpop is null ? 'default' : (p.requiresDpop ? 'required' : 'bearer') %}
+            <tr>
+                <td>{{ c.name }}<br><code>{{ c.identifier }}</code></td>
+                <td>{{ c.confidential ? 'confidential (secret)' : 'public (browser)' }}</td>
+                <td class="expr">{% for u in c.redirectUris %}{{ u }}<br>{% endfor %}</td>
+                <td>
+                    {% if can_edit %}
+                        <form method="post" action="{{ path('app_admin_settings_client', {identifier: c.identifier}) }}" class="row">
+                            <div><select name="dpop" aria-label="DPoP rule of {{ c.name }}">
+                                <option value="default" {{ rule == 'default' ? 'selected' }}>Follow the setting ({{ dpop_required ? 'required' : 'not required' }})</option>
+                                <option value="required" {{ rule == 'required' ? 'selected' }}>Required</option>
+                                <option value="bearer" {{ rule == 'bearer' ? 'selected' }}>Not required (Bearer allowed)</option>
+                            </select></div>
+                            <div style="flex: 0 0 auto"><button type="submit" class="small secondary">Save</button></div>
+                            <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_settings') }}">
+                        </form>
+                    {% else %}
+                        {{ rule == 'default' ? 'follows the setting' : (rule == 'required' ? 'required' : 'not required') }}
+                    {% endif %}
+                </td>
+            </tr>
+        {% else %}
+            <tr><td colspan="4" class="muted">No application yet.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

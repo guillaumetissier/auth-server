@@ -31,7 +31,9 @@ Argon2id hashes at each user's first successful login.
 
 ## Rolling out two-factor authentication
 
-`APP_2FA_MODE` decides what happens to users who have not set up 2FA yet:
+The two-factor mode decides what happens to users who have not set up 2FA yet. The super-administrator
+chooses it, and the deadline, in the administration pages (**Settings**); `APP_2FA_MODE` and
+`APP_2FA_DEADLINE` are the defaults used until then:
 
 | Mode | User without 2FA | Can disable 2FA |
 |---|---|---|
@@ -39,9 +41,8 @@ Argon2id hashes at each user's first successful login.
 | `grace` (default) | Sees the enrollment page at every login, with a **Later** button. From `APP_2FA_DEADLINE` on, the button disappears: 2FA is required. | No |
 | `required` | Must enroll at the next login. | No |
 
-Leave `APP_2FA_DEADLINE` empty until the date is decided: the page then says 2FA will "soon" be required.
-Once it is set (and the container recreated with `docker compose up -d`), the page shows the date and the
-number of days left.
+Leave the deadline empty until the date is decided: the page then says 2FA will "soon" be required.
+Once it is set in **Settings** (it applies at once), the page shows the date and the number of days left.
 
 Follow the roll-out with `make 2fa-status`; `make 2fa-status FLAG=--pending` lists the accounts still
 without 2FA, how often they postponed and when they last signed in.

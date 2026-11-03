@@ -1,6 +1,7 @@
 # Security model
 
-- **PKCE with S256 for every client**, public and confidential; `plain` is refused.
+- **PKCE with S256**: always for public clients (browser, mobile), and for confidential clients unless the
+  super-administrator turns it off for them (Settings); `plain` is always refused.
 - **DPoP** (RFC 9449): the proof is checked at `/token` (type, asymmetric algorithm, signature, `htm`,
   `htu`, `iat` window, `jti` replay protection stored atomically). The access token carries `cnf.jkt` and
   the response says `token_type: DPoP`. The refresh token is **bound to the same key**: a stolen refresh

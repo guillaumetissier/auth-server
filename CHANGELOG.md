@@ -6,7 +6,16 @@ one version number covers the server and its browser client (`packages/oauth-dpo
 
 ## [Unreleased]
 
-## [0.3.0] - 2026-11-02
+### Added
+- Settings page (`/admin/settings`) for the super-administrator, read-only for `ROLE_ADMIN`: DPoP required by
+  default and per application, PKCE for confidential clients, two-factor mode and deadline. Saved values
+  (`system_setting` table, migration) take precedence over `DPOP_REQUIRED_BY_DEFAULT`,
+  `PKCE_FOR_CONFIDENTIAL_CLIENTS` (new), `APP_2FA_MODE` and `APP_2FA_DEADLINE`, which stay the defaults.
+
+### Changed
+- PKCE may be turned off for confidential clients (setting); it stays mandatory for public clients.
+
+## [0.2.0] - 2026-11-02
 
 ### Added
 - Dashboard after sign-in: notifications (two-factor not enabled, few backup codes, no e-mail address)
@@ -25,18 +34,6 @@ one version number covers the server and its browser client (`packages/oauth-dpo
 - Domain administration: renaming, deletion of empty domains, users per domain.
 - `users.email` column (migration), `--email` option of `app:user:create` (`make user EMAIL=…`).
 - Webhook events `user.updated`, `user.disabled`, `user.enabled`, `user.deleted`, `user.password_link_sent`.
-
-### Changed
-- Sign-in lands on `/dashboard` instead of `/account`.
-- A disabled account, or a changed password, username or role, ends the open sessions at their next request.
-
-### Fixed
-- A super-administrator without `ROLE_ADMIN` could not open the administration pages unless he belonged
-  to a domain.
-
-## [0.2.0] - 2026-11-02
-
-### Added (demo and browser client)
 - `demo/`: a React SPA and a Symfony API (resource-guard), each in its own container, with a seed script
   (client, users, domains, rights). The SPA shows the resources received or the error and the reason of each
   refusal, and can break its requests on purpose (no proof, Bearer, tampered token, replayed proof).
@@ -47,6 +44,14 @@ one version number covers the server and its browser client (`packages/oauth-dpo
   session, then sends the browser back to the application (only to the origin of one of the client's
   redirect URIs). Advertised as `end_session_endpoint`; `logoutUrl()` in the browser client. The demo SPA
   uses it, so that signing out and in again asks for credentials.
+
+### Changed
+- Sign-in lands on `/dashboard` instead of `/account`.
+- A disabled account, or a changed password, username or role, ends the open sessions at their next request.
+
+### Fixed
+- A super-administrator without `ROLE_ADMIN` could not open the administration pages unless he belonged
+  to a domain.
 
 ## [0.1.0] - 2026-10-22
 
@@ -70,7 +75,6 @@ First public version.
 - Quality checks in CI: PHPUnit functional tests, PHPStan at level max, PHP-CS-Fixer, and an end-to-end
   check over real HTTP (`tools/e2e.php`) against the Docker image and MySQL.
 
-[Unreleased]: https://github.com/guillaumetissier/auth-server/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/guillaumetissier/auth-server/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/guillaumetissier/auth-server/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/guillaumetissier/auth-server/releases/tag/v0.1.0
-[0.2.0]: https://github.com/guillaumetissier/auth-server/releases/tag/v0.2.0
-[0.3.0]: https://github.com/guillaumetissier/auth-server/releases/tag/v0.3.0

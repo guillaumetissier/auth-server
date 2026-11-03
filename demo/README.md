@@ -39,27 +39,35 @@ This creates in the auth server:
 - the application (client) `my-spa`, if it does not exist yet;
 - the resource types `vehicle` and `invoice`;
 - the domains `a1` (Group) > `a10` (North) > `a100` (North depot), and `a1` > `a11` (South);
-- four users, all with the password **`demo-password`**:
+- five users, all with the password **`demo-password`**:
 
 | User | Id (`sub`) | Domain | Rights | Purpose |
 |---|---|---|---|---|
 | `reader` | 101 | a10 | `vehicle:r` on a10 and subdomains | Reads vehicles of North, nothing else |
 | `manager` | 102 | a10 | `vehicle:m invoice:r` on a10 and subdomains | Manages vehicles, reads invoices of North |
 | `outsider` | 103 | none | none | Signed in, but allowed nothing |
-| `support` | 100 | none | `ROLE_ADMIN` | Impersonates users, in read-only mode |
+| `support` | 100 | none | `ROLE_ADMIN` | Impersonates users, in read-only mode; sees the administration pages without changing anything |
+| `admin` | 1 | none | `ROLE_SUPER_ADMIN` | Changes everything in the administration pages, including **Settings** (if no other account is super-administrator yet) |
 
 Each user has the e-mail address `<user>@demo.test`: "Forgot your password?" on the sign-in page sends
 the link to Mailpit, <http://localhost:8025>. The auth server's own pages (dashboard, profile,
 administration) are at <http://localhost:8080>: sign in there as `support` to look at the users and
-domains of the demo.
+domains of the demo, or as `admin` to change them and the system settings.
 
 The command can be run again: what already exists is kept. Expected end of the output:
 
 ```
+admin is the super-administrator
+== Domains and rights
  [OK] Imported 2 resource type(s), 4 domain(s), 2 membership(s), 2 grant(s).
 
 Done. Open http://localhost:5173 and sign in as reader, manager, outsider or support (demo-password).
+Administration: http://localhost:8080, signed in as admin (super-administrator) or support (read-only).
 ```
+
+If another account is already the super-administrator (there can be only one), the seed says so and
+leaves it: `make role USERNAME=admin ROLE=ROLE_SUPER_ADMIN FLAG=--transfer` in the parent folder moves
+the role to `admin`.
 
 ## 3. Start the SPA and the API
 

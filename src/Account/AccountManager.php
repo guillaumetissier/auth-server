@@ -8,6 +8,7 @@ use App\Entity\AccessGrant;
 use App\Entity\Domain;
 use App\Entity\ImpersonationLink;
 use App\Entity\ImpersonationSession;
+use App\Entity\Setting;
 use App\Entity\User;
 use App\Event\AccountEvent;
 use App\Repository\UserRepository;
@@ -171,6 +172,7 @@ final readonly class AccountManager
         $this->em->createQuery('DELETE FROM '.AccessGrant::class.' g WHERE g.user = :u')->setParameter('u', $user)->execute();
         $this->em->createQuery('UPDATE '.AccessGrant::class.' g SET g.grantedBy = NULL WHERE g.grantedBy = :u')->setParameter('u', $user)->execute();
         $this->em->createQuery('UPDATE '.Domain::class.' d SET d.owner = NULL WHERE d.owner = :u')->setParameter('u', $user)->execute();
+        $this->em->createQuery('UPDATE '.Setting::class.' s SET s.updatedBy = NULL WHERE s.updatedBy = :u')->setParameter('u', $user)->execute();
         $this->em->createQuery('DELETE FROM '.ImpersonationLink::class.' l WHERE l.session IN (SELECT s.id FROM '.ImpersonationSession::class.' s WHERE s.admin = :u OR s.target = :u)')->setParameter('u', $user)->execute();
         $this->em->createQuery('DELETE FROM '.ImpersonationSession::class.' s WHERE s.admin = :u OR s.target = :u')->setParameter('u', $user)->execute();
         $this->em->remove($user);

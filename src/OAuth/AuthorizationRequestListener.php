@@ -10,6 +10,7 @@ use App\Impersonation\ImpersonationContext;
 use App\Impersonation\ImpersonationManager;
 use App\Impersonation\ImpersonationPolicy;
 use App\Repository\UserRepository;
+use App\Settings\SystemSettings;
 use App\TwoFactor\TwoFactorPolicy;
 use League\Bundle\OAuth2ServerBundle\Event\AuthorizationRequestResolveEvent;
 use League\Bundle\OAuth2ServerBundle\OAuth2Events;
@@ -23,7 +24,8 @@ use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 /**
  * Decides on authorization requests reaching /authorize (the user is already logged in, 2FA included).
  *
- *  - PKCE with S256 is mandatory for every client (OAuth 2.1), not only public ones;
+ *  - PKCE with S256 is mandatory for public clients, and for confidential ones unless the system
+ *    setting says otherwise (OAuth 2.1 recommends it for all); "plain" is never accepted;
  *  - users without TOTP are sent to the enrollment page first, as TwoFactorPolicy decides
  *    (during the grace period they may postpone it once per login session);
  *  - "impersonate=<external user id>": an administrator asks for a code for another user. The
@@ -48,12 +50,14 @@ final readonly class AuthorizationRequestListener
         private UserRepository $users,
         private ClockInterface $clock,
         private TwoFactorPolicy $twoFactorPolicy,
+        private SystemSettings $settings,
     ) {
     }
 
     public function __invoke(AuthorizationRequestResolveEvent $event): void
     {
-        if (null === $event->getCodeChallenge() || 'S256' !== $event->getCodeChallengeMethod()) {
+        $pkceRequired = !$event->getClient()->isConfidential() || $this->settings->pkceForConfidentialClients();
+        if (null === $event->getCodeChallenge() ? $pkceRequired : 'S256' !== $event->getCodeChallengeMethod()) {
             throw OAuthServerException::invalidRequest('code_challenge', 'PKCE with code_challenge_method=S256 is required.');
         }
 

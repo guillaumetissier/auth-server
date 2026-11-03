@@ -1,5 +1,6 @@
 #!/bin/sh
-# Creates in the auth server what the demo needs: the "my-spa" client, four users, domains and rights.
+# Creates in the auth server what the demo needs: the "my-spa" client, five users (one of them the
+# super-administrator), domains and rights.
 # Safe to run again: what already exists is kept.
 #
 #   ./seed.sh                                  # auth server started with Docker Compose (parent folder)
@@ -26,15 +27,22 @@ run league:oauth2-server:create-client my-spa my-spa --public \
 run app:client:policy my-spa '--impersonation-uri=http://localhost:5173/?impersonate={user}' >/dev/null
 
 echo "== Users (password: $PASSWORD)"
-for user in reader:101 manager:102 outsider:103 support:100; do
+for user in reader:101 manager:102 outsider:103 support:100 admin:1; do
     name=${user%%:*}
     id=${user##*:}
     run app:user:create "$name" "$id" --password="$PASSWORD" --email="$name@demo.test" >/dev/null 2>&1 && echo "$name created" || echo "$name already exists"
 done
 run app:user:role support ROLE_ADMIN >/dev/null 2>&1 || true
+# There is only one super-administrator: if another account already holds the role, it keeps it.
+if run app:user:role admin ROLE_SUPER_ADMIN >/dev/null 2>&1; then
+    echo "admin is the super-administrator"
+else
+    echo "admin is not the super-administrator: another account holds the role (make role USERNAME=admin ROLE=ROLE_SUPER_ADMIN FLAG=--transfer)"
+fi
 
 echo "== Domains and rights"
 run app:access:import "$import_file"
 
 echo
 echo "Done. Open http://localhost:5173 and sign in as reader, manager, outsider or support ($PASSWORD)."
+echo "Administration: http://localhost:8080, signed in as admin (super-administrator) or support (read-only)."
