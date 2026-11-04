@@ -1,25 +1,40 @@
 import { useEffect, useState } from 'react';
-import { decodeJwt, handleCallback, loadSession, login, logout, refresh } from './auth.js';
+import { abandonedLogin, decodeJwt, handleCallback, loadSession, login, logout, refresh, SignInError } from './auth.js';
 import { callApi } from './api.js';
 import { config, apiUrl } from './config.js';
-import { explain } from './explain.js';
+import { explain, explainSignIn } from './explain.js';
 import { requests } from './requests.js';
+import { modes, requestScenarios, signInScenarios } from './scenarios.js';
 
-const defaultOptions = { sendToken: true, sendProof: true, asBearer: false, tamper: false, replay: false };
+const MODE_KEY = 'demo.mode';
 
-const optionLabels = {
-  sendToken: 'Send the access token',
-  sendProof: 'Send a DPoP proof',
-  asBearer: 'Send the token as "Bearer" instead of "DPoP"',
-  tamper: 'Tamper with the token (change its signature)',
-  replay: 'Replay the previous proof instead of a new one',
-};
+// The chosen tab survives the redirect to the auth server. Storage may be unavailable: the tab is then not kept.
+function storedMode() {
+  try {
+    return sessionStorage.getItem(MODE_KEY) === 'pkce' ? 'pkce' : 'dpop';
+  } catch {
+    return 'dpop';
+  }
+}
+
+function storeMode(mode) {
+  try {
+    sessionStorage.setItem(MODE_KEY, mode);
+  } catch {
+    // Not kept: the default tab is shown after the redirect.
+  }
+}
+
+const sessionMode = (session) => (session ? (session.keyPair ? 'dpop' : 'pkce') : null);
 
 export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [mode, setMode] = useState(storedMode);
+  const [signInScenario, setSignInScenario] = useState('correct');
+  const [signInFailure, setSignInFailure] = useState(null);
   const [authError, setAuthError] = useState(null);
-  const [options, setOptions] = useState(defaultOptions);
+  const [scenario, setScenario] = useState('correct');
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
   const [impersonate, setImpersonate] = useState('');
@@ -29,20 +44,42 @@ export default function App() {
     // Opened by the "Impersonate" button of the auth server's administration pages.
     const impersonateParam = new URLSearchParams(window.location.search).get('impersonate');
     if (impersonateParam && window.location.pathname !== '/callback') {
-      login(impersonateParam);
+      login(impersonateParam, { dpop: storedMode() === 'dpop' });
       return;
+    }
+
+    if (window.location.pathname !== '/callback') {
+      // Back from a sign-in the auth server refused on its own page (browser's Back button).
+      const pending = abandonedLogin();
+      const left = signInScenarios.find((s) => s.id === pending?.scenario && s.leavesSpa);
+      if (left) {
+        setSignInFailure(new SignInError('auth server', 'invalid_request', 'Shown by the auth server on its own page, as a JSON error.', left.id));
+      }
     }
 
     const start = window.location.pathname === '/callback' ? handleCallback() : loadSession();
     start
-      .then(setSession)
-      .catch((error) => setAuthError(error.message))
+      .then((loaded) => {
+        setSession(loaded);
+        if (loaded) {
+          setMode(sessionMode(loaded));
+          storeMode(sessionMode(loaded));
+        }
+      })
+      .catch((error) => (error instanceof SignInError ? setSignInFailure(error) : setAuthError(error.message)))
       .finally(() => setLoading(false));
   }, []);
 
+  function chooseMode(next) {
+    setMode(next);
+    storeMode(next);
+    setScenario('correct');
+    setResult(null);
+  }
+
   async function run(request) {
     setBusy(true);
-    setResult(await callApi(request, session, options));
+    setResult({ ...(await callApi(request, session, scenario)), scenario });
     setBusy(false);
   }
 
@@ -55,15 +92,13 @@ export default function App() {
     }
   }
 
-  async function onLogout() {
-    await logout(); // leaves the page: the auth server closes its session and sends the browser back
-  }
-
   if (loading) {
     return <main className="page"><p>Loading…</p></main>;
   }
 
   const claims = session ? decodeJwt(session.tokens.accessToken) : null;
+  const otherMode = session && sessionMode(session) !== mode;
+  const chosenSignIn = signInScenarios.find((s) => s.id === signInScenario);
 
   return (
     <main className="page">
@@ -75,117 +110,196 @@ export default function App() {
         </p>
       </header>
 
-      {authError && <div className="alert error" role="alert">{authError}</div>}
-
-      <section className="card">
-        <h2>Session</h2>
-        {session ? (
-          <>
-            <dl className="claims">
-              <dt>User (sub)</dt><dd>{claims.sub}</dd>
-              <dt>Application</dt><dd>{Array.isArray(claims.aud) ? claims.aud.join(', ') : claims.aud}</dd>
-              <dt>Scopes</dt><dd>{(claims.scopes ?? []).join(' ') || '—'}</dd>
-              <dt>Domain</dt><dd>{claims.dom ?? 'none'}</dd>
-              <dt>Rights</dt>
-              <dd>
-                {(claims.acl ?? []).length === 0 ? 'none' : (
-                  <ul>{claims.acl.map(([domain, subdomains, expression], i) => (
-                    <li key={i}><code>{expression}</code> on {domain}{subdomains ? ' and subdomains' : ''}</li>
-                  ))}</ul>
-                )}
-              </dd>
-              {claims.act && (<><dt>Impersonated by</dt><dd>{claims.act.sub} ({claims.imp_mode})</dd></>)}
-              <dt>Expires</dt><dd>{new Date(claims.exp * 1000).toLocaleTimeString()}</dd>
-            </dl>
-            <div className="actions">
-              <button onClick={onRefresh}>Refresh tokens</button>
-              <button className="secondary" onClick={onLogout}>Sign out</button>
-            </div>
-          </>
-        ) : (
-          <div className="actions">
-            <button onClick={() => login()}>Sign in</button>
-            <span className="help">You are sent to the auth server, then back here.</span>
-          </div>
-        )}
-        <details>
-          <summary>Impersonate a user (administrators)</summary>
-          <div className="actions">
-            <input
-              aria-label="External id of the user"
-              placeholder="External id, e.g. 101"
-              value={impersonate}
-              onChange={(e) => setImpersonate(e.target.value.trim())}
-            />
-            <button className="secondary" disabled={!impersonate} onClick={() => login(impersonate)}>
-              Sign in as this user
-            </button>
-          </div>
-          <p className="help">Needs ROLE_ADMIN or ROLE_SUPER_ADMIN on the auth server, with two-factor authentication set up.</p>
-        </details>
-      </section>
-
-      <div className="columns">
-        <section className="card">
-          <h2>Requests</h2>
-          <fieldset>
-            <legend>How to send them</legend>
-            {Object.entries(optionLabels).map(([name, label]) => (
-              <label key={name} className="check">
-                <input
-                  type="checkbox"
-                  checked={options[name]}
-                  onChange={(e) => setOptions({ ...options, [name]: e.target.checked })}
-                />
-                {label}
-              </label>
-            ))}
-            <button className="link" onClick={() => setOptions(defaultOptions)}>Reset to a correct request</button>
-          </fieldset>
-
-          <ul className="requests">
-            {requests.map((request) => (
-              <li key={request.id}>
-                <button disabled={busy} onClick={() => run(request)}>
-                  <span className={`method ${request.method}`}>{request.method}</span> {request.label}
-                </button>
-                <span className="help"><code>{request.path}</code> {request.hint}</span>
-              </li>
-            ))}
-          </ul>
-
-          <form
-            className="custom"
-            onSubmit={(e) => {
-              e.preventDefault();
-              run({ ...custom, body: ['POST', 'PUT'].includes(custom.method) ? {} : undefined });
-            }}
+      <div className="tabs" role="tablist" aria-label="Mode">
+        {Object.entries(modes).map(([id, { label }]) => (
+          <button
+            key={id}
+            role="tab"
+            id={`tab-${id}`}
+            aria-selected={mode === id}
+            aria-controls="mode-panel"
+            className={mode === id ? 'tab active' : 'tab'}
+            onClick={() => chooseMode(id)}
           >
-            <select aria-label="Method" value={custom.method} onChange={(e) => setCustom({ ...custom, method: e.target.value })}>
-              {['GET', 'POST', 'PUT', 'DELETE'].map((m) => <option key={m}>{m}</option>)}
-            </select>
-            <input aria-label="Path" value={custom.path} onChange={(e) => setCustom({ ...custom, path: e.target.value })} />
-            <button disabled={busy}>Send</button>
-          </form>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div id="mode-panel" role="tabpanel" aria-labelledby={`tab-${mode}`}>
+        <p className="help mode-description">{modes[mode].description}</p>
+
+        {authError && <div className="alert error" role="alert">{authError}</div>}
+
+        <section className="card">
+          <h2>Session</h2>
+          {session ? (
+            <>
+              <dl className="claims">
+                <dt>User (sub)</dt><dd>{claims.sub}</dd>
+                <dt>Application</dt><dd>{Array.isArray(claims.aud) ? claims.aud.join(', ') : claims.aud}</dd>
+                <dt>Scopes</dt><dd>{(claims.scopes ?? []).join(' ') || '—'}</dd>
+                <dt>Domain</dt><dd>{claims.dom ?? 'none'}</dd>
+                <dt>Rights</dt>
+                <dd>
+                  {(claims.acl ?? []).length === 0 ? 'none' : (
+                    <ul>{claims.acl.map(([domain, subdomains, expression], i) => (
+                      <li key={i}><code>{expression}</code> on {domain}{subdomains ? ' and subdomains' : ''}</li>
+                    ))}</ul>
+                  )}
+                </dd>
+                {claims.act && (<><dt>Impersonated by</dt><dd>{claims.act.sub} ({claims.imp_mode})</dd></>)}
+                <dt>Token type</dt>
+                <dd>{session.keyPair ? 'DPoP, bound to a key of this browser' : 'Bearer, not bound: usable by whoever holds it'}</dd>
+                <dt>Expires</dt><dd>{new Date(claims.exp * 1000).toLocaleTimeString()}</dd>
+              </dl>
+              <div className="actions">
+                <button onClick={onRefresh}>Refresh tokens</button>
+                <button className="secondary" onClick={() => logout()}>Sign out</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <fieldset>
+                <legend>How to sign in</legend>
+                {signInScenarios.map((s) => (
+                  <label key={s.id} className="check option">
+                    <input
+                      type="radio"
+                      name="sign-in-scenario"
+                      value={s.id}
+                      checked={signInScenario === s.id}
+                      onChange={() => setSignInScenario(s.id)}
+                    />
+                    <span>{s.label}<span className="help"> — {s.hint}</span></span>
+                  </label>
+                ))}
+              </fieldset>
+              <div className="actions">
+                <button onClick={() => login(undefined, { dpop: mode === 'dpop', scenario: signInScenario })}>Sign in</button>
+                <span className="help">
+                  {chosenSignIn.leavesSpa
+                    ? 'You will stay on the auth server, which shows its error: come back with the Back button.'
+                    : 'You are sent to the auth server, then back here.'}
+                </span>
+              </div>
+              {signInFailure && <SignInFailure failure={signInFailure} />}
+            </>
+          )}
+          <details>
+            <summary>Impersonate a user (administrators)</summary>
+            <div className="actions">
+              <input
+                aria-label="External id of the user"
+                placeholder="External id, e.g. 101"
+                value={impersonate}
+                onChange={(e) => setImpersonate(e.target.value.trim())}
+              />
+              <button
+                className="secondary"
+                disabled={!impersonate || Boolean(session)}
+                onClick={() => login(impersonate, { dpop: mode === 'dpop' })}
+              >
+                Sign in as this user
+              </button>
+            </div>
+            <p className="help">Needs ROLE_ADMIN or ROLE_SUPER_ADMIN on the auth server, with two-factor authentication set up.</p>
+          </details>
         </section>
 
-        <section className="card" aria-live="polite">
-          <h2>Result</h2>
-          {result ? <Result result={result} /> : <p className="help">Choose a request.</p>}
-        </section>
+        <div className="columns">
+          <section className="card">
+            <h2>Requests</h2>
+            {otherMode ? (
+              <div className="alert notice" role="status">
+                This session has {session.keyPair ? 'DPoP-bound' : 'Bearer'} tokens: it was opened in the
+                “{modes[sessionMode(session)].label}” tab. Go back to that tab, or sign out and sign in again here.
+              </div>
+            ) : (
+              <>
+                <fieldset>
+                  <legend>How to send them</legend>
+                  {requestScenarios[mode].map((s) => (
+                    <label key={s.id} className="check option">
+                      <input
+                        type="radio"
+                        name="request-scenario"
+                        value={s.id}
+                        checked={scenario === s.id}
+                        onChange={() => setScenario(s.id)}
+                      />
+                      <span>{s.label}<span className="help"> — {s.hint}</span></span>
+                    </label>
+                  ))}
+                </fieldset>
+
+                <ul className="requests">
+                  {requests.map((request) => (
+                    <li key={request.id}>
+                      <button disabled={busy} onClick={() => run(request)}>
+                        <span className={`method ${request.method}`}>{request.method}</span> {request.label}
+                      </button>
+                      <span className="help"><code>{request.path}</code> {request.hint}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <form
+                  className="custom"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    run({ ...custom, body: ['POST', 'PUT'].includes(custom.method) ? {} : undefined });
+                  }}
+                >
+                  <select aria-label="Method" value={custom.method} onChange={(e) => setCustom({ ...custom, method: e.target.value })}>
+                    {['GET', 'POST', 'PUT', 'DELETE'].map((m) => <option key={m}>{m}</option>)}
+                  </select>
+                  <input aria-label="Path" value={custom.path} onChange={(e) => setCustom({ ...custom, path: e.target.value })} />
+                  <button disabled={busy}>Send</button>
+                </form>
+              </>
+            )}
+          </section>
+
+          <section className="card" aria-live="polite">
+            <h2>Result</h2>
+            {result ? <Result result={result} mode={mode} /> : <p className="help">Choose a request.</p>}
+          </section>
+        </div>
       </div>
     </main>
   );
 }
 
-function Result({ result }) {
+function SignInFailure({ failure }) {
+  return (
+    <div className="result" data-testid="sign-in-failure">
+      <div className="status bad">Sign-in refused by the {failure.source}</div>
+      <dl className="reason">
+        <dt>Scenario</dt><dd>{signInScenarios.find((s) => s.id === failure.scenario)?.label ?? failure.scenario}</dd>
+        <dt>Error</dt><dd data-testid="sign-in-error"><code>{failure.error}</code></dd>
+        {failure.description && (<><dt>Reason</dt><dd>{failure.description}</dd></>)}
+        <dt>In plain words</dt><dd data-testid="sign-in-explanation">{explainSignIn(failure)}</dd>
+      </dl>
+    </div>
+  );
+}
+
+function Result({ result, mode }) {
   const error = result.body && typeof result.body === 'object' ? result.body : null;
+  const scenarioLabel = requestScenarios[mode].find((s) => s.id === result.scenario)?.label;
 
   return (
     <div className="result">
       <p className="request-line">
         <span className={`method ${result.request.method}`}>{result.request.method}</span> <code>{result.url}</code>
       </p>
+      {scenarioLabel && <p className="help">Sent as: {scenarioLabel}</p>}
+      {result.firstStatus !== undefined && (
+        <p className="help" data-testid="first-status">
+          First sending of the proof: {result.firstStatus}. Second sending, with the same proof:
+        </p>
+      )}
 
       {result.networkError ? (
         <div className="status bad" data-testid="status">No answer</div>
@@ -205,6 +319,8 @@ function Result({ result }) {
           {result.wwwAuthenticate && (<><dt>WWW-Authenticate</dt><dd><code>{result.wwwAuthenticate}</code></dd></>)}
         </dl>
       )}
+
+      {result.ok && <p className="help" data-testid="explanation">{explain(result)}</p>}
 
       {result.ok && result.body?.items ? (
         <table>

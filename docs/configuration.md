@@ -10,9 +10,10 @@ Every setting is an environment variable.
 
 After changing `.env.docker`, apply it with `docker compose up -d` (the container is recreated, data is kept).
 
-Four of them are **defaults** that the super-administrator can change in the administration pages
+Some of them are **defaults** that the super-administrator can change in the administration pages
 (**Settings**, `/admin/settings`): `DPOP_REQUIRED_BY_DEFAULT`, `PKCE_FOR_CONFIDENTIAL_CLIENTS`,
-`APP_2FA_MODE` and `APP_2FA_DEADLINE`. A value saved there takes precedence over the variable, at once and
+`APP_2FA_MODE`, `APP_2FA_DEADLINE`, `OAUTH_ACCESS_TOKEN_TTL`, `OAUTH_REFRESH_TOKEN_TTL`, `IMPERSONATION_TTL`
+and `IMPERSONATION_ACCESS_TOKEN_TTL`. A value saved there takes precedence over the variable, at once and
 without restarting; **Use the defaults of the server configuration** on that page goes back to the variables.
 
 | Variable | Default | Meaning |

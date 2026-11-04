@@ -499,6 +499,9 @@ domains created, for the users they administer.
 
 - **Token security**: whether applications must use DPoP (and the rule of each application), and whether
   confidential applications (with a secret) must use PKCE. Browser applications always use PKCE.
+- **Token lifetimes**: access token (15 minutes by default), refresh token, that is how long users stay
+  signed in to an application (30 days), and the two lifetimes of impersonations. Within limits, so
+  that a mistake cannot make tokens last for years.
 - **Two-factor authentication**: optional, grace period with the date from which it becomes required, or
   required.
 

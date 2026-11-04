@@ -123,7 +123,7 @@ final readonly class AccountManager
 
     /**
      * Disabled: no sign-in, sessions end at their next request, refresh tokens revoked.
-     * Access tokens already issued stay valid until they expire (OAUTH_ACCESS_TOKEN_TTL).
+     * Access tokens already issued stay valid until they expire (access token lifetime, see Settings).
      */
     public function setEnabled(User $user, bool $enabled, ?User $actor): void
     {

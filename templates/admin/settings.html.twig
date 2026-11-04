@@ -34,6 +34,29 @@
             application cannot send it.</p>
         {{ _self.source(rows['pkce.confidential_clients'], defaults['pkce.confidential_clients'] == '1' ? 'required' : 'not required') }}
 
+        <h2>Token lifetimes</h2>
+        <table>
+            <thead><tr><th>Lifetime</th><th style="width: 260px">Duration</th><th>Default</th></tr></thead>
+            <tbody>
+            {% for name, l in lifetimes %}
+                <tr>
+                    <td><strong>{{ l.label }}</strong><p class="help">{{ l.help }} Allowed: {{ l.range }}.</p>
+                        {{ _self.source(rows[name], l.default) }}</td>
+                    <td>
+                        <div class="row" style="flex-wrap: nowrap">
+                            <div style="flex: 1 1 80px"><input type="text" inputmode="numeric" name="{{ l.field }}_amount" value="{{ l.amount }}" aria-label="{{ l.label }}: amount" required {{ can_edit ? '' : 'disabled' }}></div>
+                            <div style="flex: 1 1 110px"><select name="{{ l.field }}_unit" aria-label="{{ l.label }}: unit" {{ can_edit ? '' : 'disabled' }}>
+                                {% for u in units %}<option value="{{ u }}" {{ u == l.unit ? 'selected' }}>{{ u }}</option>{% endfor %}
+                            </select></div>
+                        </div>
+                    </td>
+                    <td>{{ l.default }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        <p class="help">Changes apply to the tokens issued from now on; tokens already issued keep their expiry.</p>
+
         <h2>Two-factor authentication</h2>
         <div class="row">
             <div>

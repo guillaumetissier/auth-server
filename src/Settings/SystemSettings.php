@@ -27,7 +27,25 @@ final class SystemSettings implements ResetInterface
     /** Date from which 2FA is required in grace mode (Y-m-d), empty: not decided. */
     public const TWO_FACTOR_DEADLINE = 'two_factor.deadline';
 
+    /** Lifetimes, as ISO 8601 durations. */
+    public const ACCESS_TOKEN_TTL = 'tokens.access_ttl';
+    public const REFRESH_TOKEN_TTL = 'tokens.refresh_ttl';
+    public const IMPERSONATION_TTL = 'impersonation.session_ttl';
+    public const IMPERSONATION_ACCESS_TOKEN_TTL = 'impersonation.access_ttl';
+
     public const TWO_FACTOR_MODES = ['optional', 'grace', 'required'];
+
+    /**
+     * Allowed range of each lifetime, in seconds: [min, max].
+     *
+     * @var array<string, array{int, int}>
+     */
+    public const LIFETIME_BOUNDS = [
+        self::ACCESS_TOKEN_TTL => [60, 86400],                  // 1 minute to 1 day
+        self::REFRESH_TOKEN_TTL => [3600, 365 * 86400],         // 1 hour to 1 year
+        self::IMPERSONATION_TTL => [300, 8 * 3600],             // 5 minutes to 8 hours
+        self::IMPERSONATION_ACCESS_TOKEN_TTL => [60, 3600],     // 1 minute to 1 hour
+    ];
 
     /** @var array<string, Setting>|null */
     private ?array $rows = null;
@@ -40,6 +58,10 @@ final class SystemSettings implements ResetInterface
         #[Autowire('%env(bool:PKCE_FOR_CONFIDENTIAL_CLIENTS)%')] private readonly bool $envPkceConfidential,
         #[Autowire('%env(APP_2FA_MODE)%')] private readonly string $envTwoFactorMode,
         #[Autowire('%env(default::APP_2FA_DEADLINE)%')] private readonly ?string $envTwoFactorDeadline,
+        #[Autowire('%env(OAUTH_ACCESS_TOKEN_TTL)%')] private readonly string $envAccessTokenTtl,
+        #[Autowire('%env(OAUTH_REFRESH_TOKEN_TTL)%')] private readonly string $envRefreshTokenTtl,
+        #[Autowire('%env(IMPERSONATION_TTL)%')] private readonly string $envImpersonationTtl,
+        #[Autowire('%env(IMPERSONATION_ACCESS_TOKEN_TTL)%')] private readonly string $envImpersonationAccessTokenTtl,
     ) {
     }
 
@@ -76,6 +98,19 @@ final class SystemSettings implements ResetInterface
         } catch (\Exception) {
             throw new \InvalidArgumentException(\sprintf('APP_2FA_DEADLINE must be a date such as 2026-12-31, "%s" given.', $value));
         }
+    }
+
+    /**
+     * A lifetime (access, refresh, impersonation…): the saved value, otherwise the environment's.
+     */
+    public function lifetime(string $name): \DateInterval
+    {
+        return new \DateInterval($this->lifetimeIso($name));
+    }
+
+    public function lifetimeIso(string $name): string
+    {
+        return $this->row($name)?->getValue() ?? $this->defaults()[$name] ?? throw new \InvalidArgumentException('Unknown lifetime '.$name);
     }
 
     /**
@@ -139,6 +174,10 @@ final class SystemSettings implements ResetInterface
             self::PKCE_CONFIDENTIAL => $this->envPkceConfidential ? '1' : '0',
             self::TWO_FACTOR_MODE => $this->envTwoFactorMode,
             self::TWO_FACTOR_DEADLINE => (string) $this->envTwoFactorDeadline,
+            self::ACCESS_TOKEN_TTL => $this->envAccessTokenTtl,
+            self::REFRESH_TOKEN_TTL => $this->envRefreshTokenTtl,
+            self::IMPERSONATION_TTL => $this->envImpersonationTtl,
+            self::IMPERSONATION_ACCESS_TOKEN_TTL => $this->envImpersonationAccessTokenTtl,
         ];
     }
 

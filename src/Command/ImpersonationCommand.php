@@ -41,7 +41,7 @@ final readonly class ImpersonationCommand
                 return Command::FAILURE;
             }
             $this->impersonations->end($session, ImpersonationSession::END_BY_COMMAND);
-            $io->success('Impersonation ended. Tokens already issued expire within IMPERSONATION_ACCESS_TOKEN_TTL.');
+            $io->success('Impersonation ended. Tokens already issued expire within the impersonation access token lifetime (Settings).');
 
             return Command::SUCCESS;
         }

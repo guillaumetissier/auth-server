@@ -111,6 +111,56 @@ final class AdminSettingsControllerTest extends AdminTestCase
         self::assertResponseStatusCodeSame(400, '"plain" is never accepted');
     }
 
+    public function testTokenLifetimesApplyToTheNextTokens(): void
+    {
+        $this->saveSettings([SystemSettings::TWO_FACTOR_MODE => 'optional']);
+        $this->signIn('root');
+        $this->browser->request('GET', '/admin/settings');
+        self::assertSelectorExists('input[name=tokens_access_ttl_amount][value="15"]');
+        $this->browser->submitForm('Save the settings', [
+            'tokens_access_ttl_amount' => '2', 'tokens_access_ttl_unit' => 'minutes',
+            'tokens_refresh_ttl_amount' => '2', 'tokens_refresh_ttl_unit' => 'days',
+            'impersonation_session_ttl_amount' => '1', 'impersonation_session_ttl_unit' => 'hours',
+            'impersonation_access_ttl_amount' => '3', 'impersonation_access_ttl_unit' => 'minutes',
+        ]);
+        $this->browser->followRedirect();
+        self::assertSelectorTextContains('.alert.ok', 'Settings saved.');
+
+        $this->signIn('reader');
+        [$status, $body] = $this->exchange($this->code(), DpopProofFactory::withNewKey());
+        self::assertSame(200, $status);
+        self::assertSame(120, $body['expires_in'] ?? null, 'access token: 2 minutes');
+
+        $refresh = $this->em()->createQueryBuilder()->select('r')->from(\League\Bundle\OAuth2ServerBundle\Model\RefreshToken::class, 'r')
+            ->orderBy('r.expiry', 'DESC')->setMaxResults(1)->getQuery()->getOneOrNullResult();
+        self::assertInstanceOf(\League\Bundle\OAuth2ServerBundle\Model\RefreshToken::class, $refresh);
+        self::assertEqualsWithDelta((new \DateTimeImmutable('+2 days'))->getTimestamp(), $refresh->getExpiry()->getTimestamp(), 60, 'refresh token: 2 days');
+
+        $impersonation = static::getContainer()->get(\App\Impersonation\ImpersonationPolicy::class);
+        self::assertSame('01:00', $impersonation->sessionTtl()->format('%H:%I'));
+        self::assertSame('00:03', $impersonation->accessTokenTtl()->format('%H:%I'));
+    }
+
+    public function testInconsistentLifetimesAreRefused(): void
+    {
+        $this->signIn('root');
+        $cases = [
+            [['tokens_refresh_ttl_amount' => '10', 'tokens_refresh_ttl_unit' => 'minutes'], 'between 1 hour and 365 days'],
+            [['tokens_access_ttl_amount' => '2', 'tokens_access_ttl_unit' => 'days'], 'between 1 minute and 1 day'],
+            [['tokens_access_ttl_amount' => '0'], 'whole number'],
+            [['tokens_access_ttl_amount' => 'ten'], 'whole number'],
+            [['tokens_access_ttl_amount' => '1', 'tokens_access_ttl_unit' => 'days', 'tokens_refresh_ttl_amount' => '1', 'tokens_refresh_ttl_unit' => 'days'], 'must live longer than the access token'],
+            [['impersonation_session_ttl_amount' => '10', 'impersonation_access_ttl_amount' => '20', 'impersonation_session_ttl_unit' => 'minutes', 'impersonation_access_ttl_unit' => 'minutes'], 'cannot live longer than the session'],
+        ];
+        foreach ($cases as [$values, $message]) {
+            $this->browser->request('GET', '/admin/settings');
+            $this->browser->submitForm('Save the settings', $values);
+            $this->browser->followRedirect();
+            self::assertSelectorTextContains('.alert.error', $message, (string) json_encode($values));
+        }
+        self::assertNull(static::getContainer()->get(SystemSettings::class)->row(SystemSettings::ACCESS_TOKEN_TTL));
+    }
+
     public function testDefaultsComeBack(): void
     {
         $this->saveSettings([SystemSettings::DPOP_REQUIRED => '0', SystemSettings::TWO_FACTOR_MODE => 'required']);

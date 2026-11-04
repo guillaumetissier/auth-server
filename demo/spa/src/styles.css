@@ -75,3 +75,19 @@ th { color: var(--muted); font-weight: 500; }
 details { margin-top: 8px; }
 summary { cursor: pointer; color: var(--muted); }
 pre { background: var(--bg); padding: 10px; border-radius: 6px; overflow-x: auto; margin: 6px 0 0; }
+
+.tabs { display: flex; gap: 4px; margin-top: 20px; border-bottom: 1px solid var(--border); }
+.tabs .tab {
+  background: transparent; color: var(--muted); border: 1px solid transparent; border-bottom: none;
+  border-radius: 8px 8px 0 0; padding: 8px 16px; margin-bottom: -1px;
+}
+.tabs .tab.active { background: var(--card); color: var(--text); border-color: var(--border); font-weight: 600; }
+.tabs .tab:hover:not(.active) { color: var(--accent); }
+#mode-panel {
+  background: var(--card); padding: 10px;
+  border: 1px solid var(--border); border-top: none; border-radius: 0 0 10px 10px;
+}
+.mode-description { margin: 0; }
+.check.option { align-items: flex-start; }
+.check.option input { margin-top: 3px; }
+.alert.notice { padding: 10px 12px; border-radius: 8px; background: #fff6e0; color: #6b4a00; }

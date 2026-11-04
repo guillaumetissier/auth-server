@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\Entity\ClientPolicy;
 use App\Entity\User;
+use App\Settings\Duration;
 use App\Settings\SystemSettings;
 use Doctrine\ORM\EntityManagerInterface;
 use League\Bundle\OAuth2ServerBundle\Manager\ClientManagerInterface;
@@ -16,12 +17,20 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
- * System settings: token security (DPoP, PKCE) and the two-factor policy, plus the DPoP policy of each
- * application. Changed by the super-administrator; platform administrators see them.
+ * System settings: token security (DPoP, PKCE), token lifetimes and the two-factor policy, plus the DPoP
+ * policy of each application. Changed by the super-administrator; platform administrators see them.
  */
 #[Route('/admin/settings')]
 final class AdminSettingsController extends AbstractAdminController
 {
+    /** What each lifetime is, for the page. */
+    private const LIFETIMES = [
+        SystemSettings::ACCESS_TOKEN_TTL => ['Access token', 'Sent with every request to an API. Short: a stolen token stops working soon. The applications renew it with the refresh token, without asking the user.'],
+        SystemSettings::REFRESH_TOKEN_TTL => ['Refresh token', 'How long a user stays signed in to an application without typing his password again (each renewal gives a new one, valid this long).'],
+        SystemSettings::IMPERSONATION_TTL => ['Impersonation session', 'How long an administrator may act on behalf of a user before signing in again.'],
+        SystemSettings::IMPERSONATION_ACCESS_TOKEN_TTL => ['Access token during an impersonation', 'Kept short, so that ending an impersonation takes effect quickly in the APIs.'],
+    ];
+
     public function __construct(
         private readonly SystemSettings $settings,
         private readonly ClientManagerInterface $clients,
@@ -39,8 +48,22 @@ final class AdminSettingsController extends AbstractAdminController
         }
 
         $rows = [];
-        foreach ([SystemSettings::DPOP_REQUIRED, SystemSettings::PKCE_CONFIDENTIAL, SystemSettings::TWO_FACTOR_MODE, SystemSettings::TWO_FACTOR_DEADLINE] as $name) {
+        foreach (array_keys($this->settings->defaults()) as $name) {
             $rows[$name] = $this->settings->row($name);
+        }
+        $lifetimes = [];
+        foreach (self::LIFETIMES as $name => [$label, $help]) {
+            [$amount, $unit] = Duration::split($this->settings->lifetimeIso($name));
+            [$min, $max] = SystemSettings::LIFETIME_BOUNDS[$name];
+            $lifetimes[$name] = [
+                'field' => str_replace('.', '_', $name),
+                'label' => $label,
+                'help' => $help,
+                'amount' => $amount,
+                'unit' => $unit,
+                'default' => Duration::human($this->settings->defaults()[$name]),
+                'range' => \sprintf('from %s to %s', Duration::human('PT'.intdiv($min, 60).'M'), Duration::human('PT'.intdiv($max, 60).'M')),
+            ];
         }
 
         $policies = [];
@@ -56,6 +79,8 @@ final class AdminSettingsController extends AbstractAdminController
             'two_factor_deadline' => $this->settings->twoFactorDeadline(),
             'rows' => $rows,
             'defaults' => $this->settings->defaults(),
+            'lifetimes' => $lifetimes,
+            'units' => array_keys(Duration::UNITS),
             'clients' => $this->clients->list(null),
             'policies' => $policies,
         ]);
@@ -81,13 +106,26 @@ final class AdminSettingsController extends AbstractAdminController
             false === $date || (null !== $date && $date->format('Y-m-d') !== $deadline) => 'The deadline must be a date such as 2026-12-31.',
             default => null,
         };
+        $lifetimes = [];
+        foreach (array_keys(self::LIFETIMES) as $name) {
+            [$lifetimes[$name], $problem] = $this->lifetime($request, $name);
+            $error ??= $problem;
+        }
+        if (null === $error) {
+            $seconds = array_map(static fn (string $iso): int => Duration::seconds($iso), $lifetimes);
+            $error = match (true) {
+                $seconds[SystemSettings::REFRESH_TOKEN_TTL] <= $seconds[SystemSettings::ACCESS_TOKEN_TTL] => 'The refresh token must live longer than the access token.',
+                $seconds[SystemSettings::IMPERSONATION_ACCESS_TOKEN_TTL] > $seconds[SystemSettings::IMPERSONATION_TTL] => 'During an impersonation, the access token cannot live longer than the session.',
+                default => null,
+            };
+        }
         if (null !== $error) {
             $this->addFlash('error', $error);
 
             return $this->redirectToRoute('app_admin_settings');
         }
 
-        $this->settings->save([
+        $this->settings->save($lifetimes + [
             SystemSettings::DPOP_REQUIRED => $request->request->getBoolean('dpop_required') ? '1' : '0',
             SystemSettings::PKCE_CONFIDENTIAL => $request->request->getBoolean('pkce_confidential') ? '1' : '0',
             SystemSettings::TWO_FACTOR_MODE => $mode,
@@ -133,6 +171,29 @@ final class AdminSettingsController extends AbstractAdminController
         $this->addFlash('success', \sprintf('DPoP policy of %s saved.', $client->getName()));
 
         return $this->redirectToRoute('app_admin_settings');
+    }
+
+    /**
+     * The lifetime typed in the form, as an ISO 8601 duration, and why it is refused (null: accepted).
+     *
+     * @return array{string, string|null}
+     */
+    private function lifetime(Request $request, string $name): array
+    {
+        $field = str_replace('.', '_', $name);
+        $amount = $request->request->getString($field.'_amount');
+        $unit = $request->request->getString($field.'_unit');
+        if (1 !== preg_match('/^[1-9][0-9]{0,5}$/', $amount) || !\array_key_exists($unit, Duration::UNITS)) {
+            return ['', \sprintf('%s: give a whole number of minutes, hours or days.', self::LIFETIMES[$name][0])];
+        }
+        $iso = Duration::toIso((int) $amount, $unit);
+        [$min, $max] = SystemSettings::LIFETIME_BOUNDS[$name];
+        $seconds = Duration::seconds($iso);
+        if ($seconds < $min || $seconds > $max) {
+            return [$iso, \sprintf('%s: between %s and %s.', self::LIFETIMES[$name][0], Duration::human('PT'.intdiv($min, 60).'M'), Duration::human('PT'.intdiv($max, 60).'M'))];
+        }
+
+        return [$iso, null];
     }
 
     private function superAdmin(Request $request): User
