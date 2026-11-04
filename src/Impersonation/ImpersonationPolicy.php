@@ -6,6 +6,7 @@ namespace App\Impersonation;
 
 use App\Access\AccessPolicy;
 use App\Entity\User;
+use App\Settings\SystemSettings;
 use GuillaumeTissier\ResourceGuard\Access\AccessLevel;
 use GuillaumeTissier\ResourceGuard\Token\Impersonation;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -31,9 +32,8 @@ final readonly class ImpersonationPolicy
      */
     public function __construct(
         #[Autowire('%env(csv:IMPERSONATION_READONLY_SCOPES)%')] array $readOnlyScopes,
-        #[Autowire('%env(IMPERSONATION_TTL)%')] private string $sessionTtl,
-        #[Autowire('%env(IMPERSONATION_ACCESS_TOKEN_TTL)%')] private string $accessTokenTtl,
         private AccessPolicy $access,
+        private SystemSettings $settings,
     ) {
         $this->readOnlyScopes = array_values(array_filter(array_map('trim', $readOnlyScopes)));
     }
@@ -109,13 +109,15 @@ final readonly class ImpersonationPolicy
         return $this->readOnlyScopes;
     }
 
+    /** System setting, default IMPERSONATION_TTL. */
     public function sessionTtl(): \DateInterval
     {
-        return new \DateInterval($this->sessionTtl);
+        return $this->settings->lifetime(SystemSettings::IMPERSONATION_TTL);
     }
 
+    /** System setting, default IMPERSONATION_ACCESS_TOKEN_TTL. */
     public function accessTokenTtl(): \DateInterval
     {
-        return new \DateInterval($this->accessTokenTtl);
+        return $this->settings->lifetime(SystemSettings::IMPERSONATION_ACCESS_TOKEN_TTL);
     }
 }

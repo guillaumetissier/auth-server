@@ -9,7 +9,7 @@ use League\Bundle\OAuth2ServerBundle\Model\Client;
 
 /**
  * Per-client settings the OAuth bundle has no column for.
- * A client without a row follows the defaults (DPOP_REQUIRED_BY_DEFAULT, no impersonation entry point).
+ * A client without a row follows the defaults (the DPoP system setting, no impersonation entry point).
  */
 #[ORM\Entity]
 #[ORM\Table(name: 'oauth2_client_policy')]
@@ -20,7 +20,7 @@ class ClientPolicy
     #[ORM\JoinColumn(name: 'client', referencedColumnName: 'identifier', nullable: false, onDelete: 'CASCADE')]
     private Client $client;
 
-    /** Null: DPOP_REQUIRED_BY_DEFAULT. */
+    /** Null: the DPoP system setting (Settings page, default DPOP_REQUIRED_BY_DEFAULT). */
     #[ORM\Column(nullable: true)]
     private ?bool $requireDpop;
 

@@ -7,7 +7,6 @@ services:
         autoconfigure: true
         bind:
             string $issuer: '%app.issuer%'
-            bool $dpopRequiredByDefault: '%env(bool:DPOP_REQUIRED_BY_DEFAULT)%'
             string $publicKeyPath: '%env(resolve:OAUTH_PUBLIC_KEY)%'
             string $privateKeyPath: '%env(resolve:OAUTH_PRIVATE_KEY)%'
             Psr\Log\LoggerInterface $auditLogger: '@monolog.logger.security_audit'

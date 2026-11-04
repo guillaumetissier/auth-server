@@ -10,6 +10,12 @@ Every setting is an environment variable.
 
 After changing `.env.docker`, apply it with `docker compose up -d` (the container is recreated, data is kept).
 
+Some of them are **defaults** that the super-administrator can change in the administration pages
+(**Settings**, `/admin/settings`): `DPOP_REQUIRED_BY_DEFAULT`, `PKCE_FOR_CONFIDENTIAL_CLIENTS`,
+`APP_2FA_MODE`, `APP_2FA_DEADLINE`, `OAUTH_ACCESS_TOKEN_TTL`, `OAUTH_REFRESH_TOKEN_TTL`, `IMPERSONATION_TTL`
+and `IMPERSONATION_ACCESS_TOKEN_TTL`. A value saved there takes precedence over the variable, at once and
+without restarting; **Use the defaults of the server configuration** on that page goes back to the variables.
+
 | Variable | Default | Meaning |
 |---|---|---|
 | `APP_ISSUER` | `http://localhost:8080` | Public address of the server, exactly as browsers reach it, without a trailing slash (production: `https://auth.example.com`). It appears in the metadata and is checked in every DPoP proof: a wrong value makes every token request fail. |
@@ -18,7 +24,8 @@ After changing `.env.docker`, apply it with `docker compose up -d` (the containe
 | `APP_2FA_MODE` | `grace` | `optional`, `grace` or `required`, see [Migrating existing users](migrating-users.md). Administrators always need 2FA. |
 | `APP_2FA_DEADLINE` | empty | In `grace` mode, the date from which 2FA becomes required, e.g. `2026-12-31`. Empty: not decided yet. |
 | `TOTP_ISSUER` | `Auth Server` | Name shown in the authenticator apps. |
-| `DPOP_REQUIRED_BY_DEFAULT` | `1` | Clients must send DPoP proofs. Per-client override: `make client-policy`. |
+| `DPOP_REQUIRED_BY_DEFAULT` | `1` | Clients must send DPoP proofs. Per-client override: **Settings** page or `make client-policy`. |
+| `PKCE_FOR_CONFIDENTIAL_CLIENTS` | `1` | Confidential clients (with a secret) must use PKCE too. Public clients (browser, mobile) always must. |
 | `OAUTH_ACCESS_TOKEN_TTL` / `OAUTH_REFRESH_TOKEN_TTL` | `PT15M` / `P30D` | Token lifetimes, as ISO 8601 durations (`PT15M` = 15 minutes, `P30D` = 30 days). |
 | `IMPERSONATION_TTL` | `PT30M` | Maximum length of an impersonation session. |
 | `IMPERSONATION_ACCESS_TOKEN_TTL` | `PT5M` | Access token lifetime during an impersonation. |

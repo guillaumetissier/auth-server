@@ -11,6 +11,8 @@ services:
       AUTH_SERVER_JWKS_URI: http://auth-server:8080/.well-known/jwks.json
       AUTH_SERVER_ALLOWED_CLIENTS: my-spa
       DEMO_SPA_ORIGIN: http://localhost:5173
+      # 1: the API refuses plain Bearer tokens. 0 (demo): it accepts them; DPoP-bound tokens still need their proof.
+      DEMO_API_REQUIRE_DPOP: "0"
     ports:
       - "8081:8080"
     networks:

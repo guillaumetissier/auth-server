@@ -1,0 +1,7 @@
+# Unix line endings everywhere, also on Windows checkouts (core.autocrlf): shell scripts with CRLF
+# endings break the containers ("/bin/sh^M: bad interpreter"), and the Makefile needs tabs and LF.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary

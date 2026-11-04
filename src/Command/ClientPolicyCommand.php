@@ -25,7 +25,7 @@ final readonly class ClientPolicyCommand
         #[Argument('Client identifier')] string $client,
         #[Option('Require DPoP proofs at the token endpoint')] bool $requireDpop = false,
         #[Option('Allow Bearer tokens (no DPoP) for this client')] bool $allowBearer = false,
-        #[Option('Follow DPOP_REQUIRED_BY_DEFAULT')] bool $defaultDpop = false,
+        #[Option('Follow the system setting (Settings page, default DPOP_REQUIRED_BY_DEFAULT)')] bool $defaultDpop = false,
         #[Option('URL where the application starts an impersonation, with {user}; "none" to remove')] ?string $impersonationUri = null,
     ): int {
         if ((int) $requireDpop + (int) $allowBearer + (int) $defaultDpop > 1) {
@@ -66,7 +66,7 @@ final readonly class ClientPolicyCommand
             match ($policy->requiresDpop()) {
                 true => 'required',
                 false => 'optional',
-                null => 'as DPOP_REQUIRED_BY_DEFAULT',
+                null => 'as the system setting',
             },
             $policy->getImpersonationStartUri() ?? 'none',
         ));

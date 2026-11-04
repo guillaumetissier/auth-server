@@ -189,8 +189,8 @@ Mailpit (<http://localhost:8025>), whatever the address.
 From now on, signing in as alice asks for the password **and** a code from the app.
 
 > When users sign in through an application, the server asks them to set up 2FA by itself. With the
-> default setting (`APP_2FA_MODE=grace`), they can click **Later**. See
-> [Migrating existing users](docs/migrating-users.md) to change this.
+> default setting (grace period), they can click **Later**. The super-administrator changes this in
+> **Settings**, see [Migrating existing users](docs/migrating-users.md).
 
 ### 3.9 See the token an application receives (optional, needs PHP)
 
@@ -340,7 +340,7 @@ MAILER_FROM_NAME="Example Inc."
 
 Special characters in the password must be URL-encoded (`@` becomes `%40`, `/` becomes `%2F`).
 
-Optionally, choose the 2FA policy (`APP_2FA_MODE`) and webhooks (`WEBHOOK_URLS`): see
+Optionally, the webhooks (`WEBHOOK_URLS`): see
 [Configuration](docs/configuration.md).
 
 **Back up `.env.docker`** somewhere safe (a password manager): without it, the two-factor secrets
@@ -494,6 +494,18 @@ domains created, for the users they administer.
   - **Rights**: grant or remove rights per domain, and see what they give;
   - **Disable the account** (he can no longer sign in, the applications can no longer renew his tokens;
     can be undone) or **Delete the account** (type its username to confirm; cannot be undone).
+
+**Settings** (`/admin/settings`, super-administrator; `ROLE_ADMIN` only looks):
+
+- **Token security**: whether applications must use DPoP (and the rule of each application), and whether
+  confidential applications (with a secret) must use PKCE. Browser applications always use PKCE.
+- **Token lifetimes**: access token (15 minutes by default), refresh token, that is how long users stay
+  signed in to an application (30 days), and the two lifetimes of impersonations. Within limits, so
+  that a mistake cannot make tokens last for years.
+- **Two-factor authentication**: optional, grace period with the date from which it becomes required, or
+  required.
+
+They apply at once. Until they are changed there, the values of `.env.docker` apply.
 
 **Domains** (`/admin`): the tree, with the number of users per domain. On a domain's page: rename it,
 set its owner and owner rights, create subdomains, see and move its users, create a user in it, and

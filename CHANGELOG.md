@@ -6,6 +6,36 @@ one version number covers the server and its browser client (`packages/oauth-dpo
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-04
+
+### Added
+- Settings page (`/admin/settings`) for the super-administrator, read-only for `ROLE_ADMIN`: DPoP required by
+  default and per application, PKCE for confidential clients, token lifetimes (access, refresh,
+  impersonation session and access token, within bounds), two-factor mode and deadline. Saved values
+  (`system_setting` table, migration) apply at once and take precedence over `DPOP_REQUIRED_BY_DEFAULT`,
+  `PKCE_FOR_CONFIDENTIAL_CLIENTS` (new), `OAUTH_ACCESS_TOKEN_TTL`, `OAUTH_REFRESH_TOKEN_TTL`,
+  `IMPERSONATION_TTL`, `IMPERSONATION_ACCESS_TOKEN_TTL`, `APP_2FA_MODE` and `APP_2FA_DEADLINE`, which stay
+  the defaults. Changes are written to the audit log.
+- Demo: the seed creates `admin`, super-administrator (unless another account already holds the role), and
+  gives every demo user an e-mail address (`<user>@demo.test`).
+- Demo SPA: two tabs, "PKCE only" (plain Bearer tokens) and "PKCE + DPoP" (tokens bound to a key of the
+  browser), each with its own failure scenarios, chosen one at a time:
+  - sign-in: wrong or missing `code_verifier`, code used twice, unexpected `state`, no `code_challenge`,
+    `code_challenge_method=plain`;
+  - requests: no token, no proof, DPoP-bound token sent as Bearer, Bearer token sent with the DPoP scheme,
+    tampered token, replayed proof, proof made for another request, proof signed by another key.
+    Each refusal shows the error, the reason and a plain-words explanation.
+- Demo API: `DEMO_API_REQUIRE_DPOP` (default `0`) to accept or refuse plain Bearer tokens.
+
+### Changed
+- PKCE may be turned off for confidential clients (setting); it stays mandatory for public clients, and
+  `plain` is always refused.
+- Demo SPA: the option checkboxes are replaced by single-choice scenario lists; the "Bind the tokens to this
+  browser (DPoP)" checkbox is replaced by the tabs.
+
+### Fixed
+- Tests: `tests/bootstrap.php` clears `var/cache/test`, so that new services and templates are found.
+
 ## [0.3.0] - 2026-11-02
 
 ### Added
@@ -74,3 +104,4 @@ First public version.
 [0.1.0]: https://github.com/guillaumetissier/auth-server/releases/tag/v0.1.0
 [0.2.0]: https://github.com/guillaumetissier/auth-server/releases/tag/v0.2.0
 [0.3.0]: https://github.com/guillaumetissier/auth-server/releases/tag/v0.3.0
+[0.4.0]: https://github.com/guillaumetissier/auth-server/releases/tag/v0.4.0

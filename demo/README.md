@@ -39,27 +39,35 @@ This creates in the auth server:
 - the application (client) `my-spa`, if it does not exist yet;
 - the resource types `vehicle` and `invoice`;
 - the domains `a1` (Group) > `a10` (North) > `a100` (North depot), and `a1` > `a11` (South);
-- four users, all with the password **`demo-password`**:
+- five users, all with the password **`demo-password`**:
 
 | User | Id (`sub`) | Domain | Rights | Purpose |
 |---|---|---|---|---|
 | `reader` | 101 | a10 | `vehicle:r` on a10 and subdomains | Reads vehicles of North, nothing else |
 | `manager` | 102 | a10 | `vehicle:m invoice:r` on a10 and subdomains | Manages vehicles, reads invoices of North |
 | `outsider` | 103 | none | none | Signed in, but allowed nothing |
-| `support` | 100 | none | `ROLE_ADMIN` | Impersonates users, in read-only mode |
+| `support` | 100 | none | `ROLE_ADMIN` | Impersonates users, in read-only mode; sees the administration pages without changing anything |
+| `admin` | 1 | none | `ROLE_SUPER_ADMIN` | Changes everything in the administration pages, including **Settings** (if no other account is super-administrator yet) |
 
 Each user has the e-mail address `<user>@demo.test`: "Forgot your password?" on the sign-in page sends
 the link to Mailpit, <http://localhost:8025>. The auth server's own pages (dashboard, profile,
 administration) are at <http://localhost:8080>: sign in there as `support` to look at the users and
-domains of the demo.
+domains of the demo, or as `admin` to change them and the system settings.
 
 The command can be run again: what already exists is kept. Expected end of the output:
 
 ```
+admin is the super-administrator
+== Domains and rights
  [OK] Imported 2 resource type(s), 4 domain(s), 2 membership(s), 2 grant(s).
 
 Done. Open http://localhost:5173 and sign in as reader, manager, outsider or support (demo-password).
+Administration: http://localhost:8080, signed in as admin (super-administrator) or support (read-only).
 ```
+
+If another account is already the super-administrator (there can be only one), the seed says so and
+leaves it: `make role USERNAME=admin ROLE=ROLE_SUPER_ADMIN FLAG=--transfer` in the parent folder moves
+the role to `admin`.
 
 ## 3. Start the SPA and the API
 
@@ -78,7 +86,7 @@ both containers run.
 4. The auth server proposes to set up two-factor authentication: click **Later**.
 5. You are back on the SPA. The **Session** box shows what the token says: user `101`, domain `/a1/a10/`,
    right `vehicle:r`.
-6. Click the requests one by one. The **Result** box shows the status, and for a refusal the error code,
+6. Click the requests one by one (the **PKCE + DPoP** tab is open by default). The **Result** box shows the status, and for a refusal the error code,
    the reason given by the API, and an explanation in plain words.
 
 What to expect:
@@ -97,19 +105,49 @@ What to expect:
 To change user, click **Sign out**, then **Sign in**. **Sign out** also closes your session on the auth
 server (you see the SPA reload), so the next sign-in asks for a username and password again.
 
-### Break the request on purpose
+### Two tabs: "PKCE only" and "PKCE + DPoP"
 
-The **How to send them** box changes how the SPA sends the next requests, to show what the API refuses:
+The tabs at the top of the page choose how the SPA signs in, and what can be tried on the requests:
 
-| Option | Result | Why |
+- **PKCE + DPoP** (default): the tokens are bound to a key created in the browser; each request carries a proof
+  signed with that key.
+- **PKCE only**: plain Bearer tokens, sent as `Authorization: Bearer`, without proof. The auth server issues them
+  only if DPoP is not required: sign in to <http://localhost:8080> as `admin`, open **Settings**, untick
+  **Applications must use DPoP**, and save. Otherwise the sign-in is refused with `invalid_dpop_proof`.
+
+The tokens are chosen at sign-in: a session opened in one tab cannot be used in the other one (sign out first).
+The demo API accepts both kinds of tokens (`DEMO_API_REQUIRE_DPOP: "0"` in `docker-compose.yml`); set it to `"1"`
+and `make up` to see an API that refuses Bearer tokens whatever the auth server allows.
+
+### Break the sign-in on purpose
+
+Before **Sign in**, the **How to sign in** box offers one scenario at a time (both tabs):
+
+| Scenario | Result | Why |
 |---|---|---|
-| Untick *Send the access token* | 401 `unauthorized` | No credentials |
-| Untick *Send a DPoP proof* | 401 `invalid_dpop_proof` | The token is bound to a key: without a proof signed by that key, a stolen token is useless |
-| Tick *Send the token as "Bearer"* | 401 `invalid_token` | A DPoP-bound token cannot be downgraded to a plain Bearer token |
-| Tick *Tamper with the token* | 401 `invalid_token` | The signature no longer matches the auth server's key |
-| Tick *Replay the previous proof*, then send the same request again | 401 `invalid_dpop_proof` | Each proof works only once |
+| Wrong code_verifier | `invalid_grant` | The SHA-256 of the verifier must match the code_challenge sent at the start: whoever steals the code from the address bar does not have the verifier |
+| No code_verifier | `invalid_request` | A code issued for a code_challenge is exchanged only with its verifier |
+| Use the code twice | `invalid_grant` (second exchange) | A code works once |
+| Unexpected state | `state_mismatch`, refused by the SPA | The answer does not belong to a sign-in started by this tab |
+| No code_challenge | `invalid_request`, on the auth server page | PKCE is required. Come back with the browser's Back button: the SPA explains |
+| code_challenge_method=plain | `invalid_request`, on the auth server page, after the password | Only S256 is accepted: "plain" puts the verifier itself in the address |
 
-**Reset to a correct request** puts the options back.
+### Break the requests on purpose
+
+The **How to send them** box changes how the SPA sends the next requests, one scenario at a time. **PKCE + DPoP** tab:
+
+| Scenario | Result | Why |
+|---|---|---|
+| No access token | 401 `unauthorized` | No credentials |
+| No DPoP proof | 401 `invalid_dpop_proof` | The token is bound to a key: without a proof signed by that key, a stolen token is useless |
+| Send it as "Bearer" | 401 `invalid_token` | A DPoP-bound token cannot be downgraded to a plain Bearer token |
+| Tampered token | 401 `invalid_token` | The signature no longer matches the auth server's key |
+| Replayed proof | first sending 200, second 401 `invalid_dpop_proof` | Each proof works only once |
+| Proof made for another request | 401 `invalid_dpop_proof` | A proof is valid for one method and one address only |
+| Proof signed by another key | 401 `invalid_dpop_proof` | What a thief holding the token, but not the browser's key, would send |
+
+**PKCE only** tab: *No access token* and *Tampered token* as above, and *Send it with the "DPoP" scheme*, refused
+with 401 `invalid_token`: a Bearer token is bound to no key, so no proof could match it.
 
 ### Impersonation (read-only)
 

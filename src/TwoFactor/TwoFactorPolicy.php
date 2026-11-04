@@ -5,17 +5,17 @@ declare(strict_types=1);
 namespace App\TwoFactor;
 
 use App\Entity\User;
+use App\Settings\SystemSettings;
 use Psr\Clock\ClockInterface;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * When users must set up two-factor authentication.
  *
- * APP_2FA_MODE:
+ * Mode (system setting, default APP_2FA_MODE):
  *  - optional: users enable it if they want, and may disable it again;
  *  - grace:    migration of existing accounts. Users without 2FA are asked at every login and may
- *              postpone ("Later") until APP_2FA_DEADLINE; from that date on it is required.
- *              With an empty deadline, postponing stays possible until a date is set;
+ *              postpone ("Later") until the deadline (default APP_2FA_DEADLINE); from that date on it
+ *              is required. With no deadline, postponing stays possible until a date is set;
  *  - required: users without 2FA must set it up at their next login.
  *
  * Administrators (ROLE_ADMIN, ROLE_SUPER_ADMIN) always need it, whatever the mode: they can impersonate.
@@ -26,36 +26,20 @@ final readonly class TwoFactorPolicy
     public const MODE_GRACE = 'grace';
     public const MODE_REQUIRED = 'required';
 
-    private string $mode;
-    private ?\DateTimeImmutable $deadline;
-
     public function __construct(
         private ClockInterface $clock,
-        #[Autowire('%env(APP_2FA_MODE)%')] string $mode,
-        #[Autowire('%env(default::APP_2FA_DEADLINE)%')] ?string $deadline,
+        private SystemSettings $settings,
     ) {
-        if (!\in_array($mode, [self::MODE_OPTIONAL, self::MODE_GRACE, self::MODE_REQUIRED], true)) {
-            throw new \InvalidArgumentException(\sprintf('APP_2FA_MODE must be optional, grace or required, "%s" given.', $mode));
-        }
-        $this->mode = $mode;
-
-        $deadline = trim((string) $deadline);
-        try {
-            // A bare date ("2026-12-31") means: required from that day on, 00:00 in the server time zone.
-            $this->deadline = '' === $deadline ? null : new \DateTimeImmutable($deadline);
-        } catch (\Exception) {
-            throw new \InvalidArgumentException(\sprintf('APP_2FA_DEADLINE must be a date such as 2026-12-31, "%s" given.', $deadline));
-        }
     }
 
     public function mode(): string
     {
-        return $this->mode;
+        return $this->settings->twoFactorMode();
     }
 
     public function deadline(): ?\DateTimeImmutable
     {
-        return $this->deadline;
+        return $this->settings->twoFactorDeadline();
     }
 
     /**
@@ -67,7 +51,7 @@ final readonly class TwoFactorPolicy
             return false;
         }
 
-        return $user->isAdministrator() || self::MODE_OPTIONAL !== $this->mode;
+        return $user->isAdministrator() || self::MODE_OPTIONAL !== $this->mode();
     }
 
     /**
@@ -77,7 +61,7 @@ final readonly class TwoFactorPolicy
     {
         return !$user->isTotpAuthenticationEnabled()
             && !$user->isAdministrator()
-            && self::MODE_GRACE === $this->mode
+            && self::MODE_GRACE === $this->mode()
             && !$this->isDeadlinePassed();
     }
 
@@ -86,12 +70,14 @@ final readonly class TwoFactorPolicy
      */
     public function canDisable(User $user): bool
     {
-        return self::MODE_OPTIONAL === $this->mode && !$user->isAdministrator();
+        return self::MODE_OPTIONAL === $this->mode() && !$user->isAdministrator();
     }
 
     public function isDeadlinePassed(): bool
     {
-        return null !== $this->deadline && $this->clock->now() >= $this->deadline;
+        $deadline = $this->deadline();
+
+        return null !== $deadline && $this->clock->now() >= $deadline;
     }
 
     /**
@@ -99,11 +85,12 @@ final readonly class TwoFactorPolicy
      */
     public function daysLeft(): ?int
     {
-        if (null === $this->deadline) {
+        $deadline = $this->deadline();
+        if (null === $deadline) {
             return null;
         }
 
-        $seconds = $this->deadline->getTimestamp() - $this->clock->now()->getTimestamp();
+        $seconds = $deadline->getTimestamp() - $this->clock->now()->getTimestamp();
 
         return max(0, (int) floor($seconds / 86400));
     }

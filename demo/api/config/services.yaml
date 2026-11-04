@@ -26,5 +26,8 @@ services:
     GuillaumeTissier\ResourceGuard\Dpop\DpopProofValidator: ~
     GuillaumeTissier\ResourceGuard\Token\AccessTokenValidator:
         arguments: { $allowedClientIds: '%env(csv:AUTH_SERVER_ALLOWED_CLIENTS)%' }
-    GuillaumeTissier\ResourceGuard\Guard\ResourceGuard: ~
+    # The demo accepts plain Bearer tokens too, to show the difference. Tokens bound to a DPoP key still
+    # need their proof. A real API keeps requiring DPoP unless some clients cannot use it.
+    GuillaumeTissier\ResourceGuard\Guard\ResourceGuard:
+        arguments: { $requireDpop: '%env(bool:DEMO_API_REQUIRE_DPOP)%' }
     GuillaumeTissier\ResourceGuard\Bridge\Symfony\ResourceGuardAuthenticator: ~
