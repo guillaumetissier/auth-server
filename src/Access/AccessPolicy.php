@@ -9,7 +9,6 @@ use App\Entity\Domain;
 use App\Entity\ResourceType;
 use App\Entity\User;
 use App\Repository\DomainRepository;
-use Doctrine\ORM\EntityManagerInterface;
 use GuillaumeTissier\ResourceGuard\Access\AccessExpression;
 use GuillaumeTissier\ResourceGuard\Access\AccessLevel;
 use GuillaumeTissier\ResourceGuard\Access\DomainPath;
@@ -31,7 +30,7 @@ final readonly class AccessPolicy
     public function __construct(
         private AccessResolver $resolver,
         private DomainRepository $domains,
-        private EntityManagerInterface $em,
+        private ResourceCatalog $catalog,
     ) {
     }
 
@@ -360,6 +359,13 @@ final readonly class AccessPolicy
             // A type the actor holds at a capped level ("*:w tire:r") must be checked even if unnamed here.
             $types = [...$types, ...$entry->expression->namedTypes()];
         }
+        foreach ($types as $type) {
+            // And the facets named nowhere, which follow their type: "vehicle:r" also reads "vehicle.media".
+            $base = AccessExpression::parentType($type) ?? $type;
+            if (!AccessExpression::isReserved($base) && '~other' !== $base) {
+                array_push($types, $base, $base.AccessExpression::FACET_SEPARATOR.'~other');
+            }
+        }
         $types = array_unique($types);
         foreach ($types as $type) {
             foreach ([false, true] as $own) {
@@ -377,17 +383,11 @@ final readonly class AccessPolicy
     }
 
     /**
-     * @return string|null an error naming the undeclared resource types, null when all are known
+     * @return string|null an error naming the undeclared resource types and facets, null when all are known
      */
     public function unknownTypes(AccessExpression $expression): ?string
     {
-        $known = array_flip(array_map(static fn (ResourceType $t): string => $t->getCode(), $this->em->getRepository(ResourceType::class)->findAll()));
-        $unknown = array_filter(
-            $expression->namedTypes(),
-            static fn (string $t): bool => !isset($known[$t]) && !\array_key_exists($t, ResourceType::RESERVED),
-        );
-
-        return [] === $unknown ? null : \sprintf('Unknown resource type(s): %s. Declare them first.', implode(', ', $unknown));
+        return $this->catalog->unknownTypes($expression);
     }
 
     /**

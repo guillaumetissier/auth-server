@@ -6,6 +6,31 @@ one version number covers the server and its browser client (`packages/oauth-dpo
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-05
+
+### Added
+- Facets of resource types: parts of a resource granted on their own, as `vehicle.pricing:w` (change the
+  prices only). The most specific rule wins (facet, then its type, then `*`), a facet right of level read
+  or more also gives read on its type, and facets take `-`, `r` or `w`. Resource servers map their fields
+  to facets and check them with `Principal::deniedFacets()` (resource-guard 0.2).
+- Administration of types and facets (`/admin/resource-types`, super-administrator): declare a facet under
+  its type with a label and a description, change labels and descriptions, see where each type and facet
+  is used, remove what no right names any more. `resource_facet` table (migration).
+- `app:resource-type` / `make resource-type` declare facets (`CODE=vehicle.pricing`, `DESCRIPTION=…`) and
+  list them with their use; `app:access:import` reads `facets` under each resource type.
+- The rights preview of a user page shows the level on each facet.
+- Audit log entries `resource_type.declared|described|removed` and `resource_facet.declared|described|removed`.
+- Demo: facets `vehicle.pricing` and `vehicle.media`, user `pricer` (`vehicle.pricing:w`), `PATCH
+  /api/vehicles/{id}` checking the fields against the facets, fields of unreadable facets hidden from
+  responses, and the requests "Change the price" and "Change the model" in the SPA.
+
+### Changed
+- A type or facet still named in some rights (users' rights, owner rights of domains,
+  `ACCESS_DEFAULT_EXPRESSION`) can no longer be removed, nor a type that still has facets.
+- Resource type codes can no longer contain a dot: it separates a type from its facet. The migration warns
+  about existing types with a dot.
+- Requires `guillaumetissier/resource-guard` `^0.2`.
+
 ## [0.4.0] - 2026-11-04
 
 ### Added
@@ -24,7 +49,7 @@ one version number covers the server and its browser client (`packages/oauth-dpo
     `code_challenge_method=plain`;
   - requests: no token, no proof, DPoP-bound token sent as Bearer, Bearer token sent with the DPoP scheme,
     tampered token, replayed proof, proof made for another request, proof signed by another key.
-    Each refusal shows the error, the reason and a plain-words explanation.
+  Each refusal shows the error, the reason and a plain-words explanation.
 - Demo API: `DEMO_API_REQUIRE_DPOP` (default `0`) to accept or refuse plain Bearer tokens.
 
 ### Changed
@@ -36,7 +61,7 @@ one version number covers the server and its browser client (`packages/oauth-dpo
 ### Fixed
 - Tests: `tests/bootstrap.php` clears `var/cache/test`, so that new services and templates are found.
 
-## [0.3.0] - 2026-11-02
+## [0.2.0] - 2026-11-02
 
 ### Added
 - Dashboard after sign-in: notifications (two-factor not enabled, few backup codes, no e-mail address)
@@ -55,18 +80,6 @@ one version number covers the server and its browser client (`packages/oauth-dpo
 - Domain administration: renaming, deletion of empty domains, users per domain.
 - `users.email` column (migration), `--email` option of `app:user:create` (`make user EMAIL=…`).
 - Webhook events `user.updated`, `user.disabled`, `user.enabled`, `user.deleted`, `user.password_link_sent`.
-
-### Changed
-- Sign-in lands on `/dashboard` instead of `/account`.
-- A disabled account, or a changed password, username or role, ends the open sessions at their next request.
-
-### Fixed
-- A super-administrator without `ROLE_ADMIN` could not open the administration pages unless he belonged
-  to a domain.
-
-## [0.2.0] - 2026-11-02
-
-### Added (demo and browser client)
 - `demo/`: a React SPA and a Symfony API (resource-guard), each in its own container, with a seed script
   (client, users, domains, rights). The SPA shows the resources received or the error and the reason of each
   refusal, and can break its requests on purpose (no proof, Bearer, tampered token, replayed proof).
@@ -77,6 +90,14 @@ one version number covers the server and its browser client (`packages/oauth-dpo
   session, then sends the browser back to the application (only to the origin of one of the client's
   redirect URIs). Advertised as `end_session_endpoint`; `logoutUrl()` in the browser client. The demo SPA
   uses it, so that signing out and in again asks for credentials.
+
+### Changed
+- Sign-in lands on `/dashboard` instead of `/account`.
+- A disabled account, or a changed password, username or role, ends the open sessions at their next request.
+
+### Fixed
+- A super-administrator without `ROLE_ADMIN` could not open the administration pages unless he belonged
+  to a domain.
 
 ## [0.1.0] - 2026-10-22
 
@@ -100,8 +121,8 @@ First public version.
 - Quality checks in CI: PHPUnit functional tests, PHPStan at level max, PHP-CS-Fixer, and an end-to-end
   check over real HTTP (`tools/e2e.php`) against the Docker image and MySQL.
 
-[Unreleased]: https://github.com/guillaumetissier/auth-server/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/guillaumetissier/auth-server/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/guillaumetissier/auth-server/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/guillaumetissier/auth-server/compare/v0.2.0...v0.4.0
+[0.2.0]: https://github.com/guillaumetissier/auth-server/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/guillaumetissier/auth-server/releases/tag/v0.1.0
-[0.2.0]: https://github.com/guillaumetissier/auth-server/releases/tag/v0.2.0
-[0.3.0]: https://github.com/guillaumetissier/auth-server/releases/tag/v0.3.0
-[0.4.0]: https://github.com/guillaumetissier/auth-server/releases/tag/v0.4.0

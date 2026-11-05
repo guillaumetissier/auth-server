@@ -55,7 +55,7 @@ legend { color: var(--muted); font-size: 0.85rem; }
 .requests button:hover:not(:disabled) { border-color: var(--accent); }
 
 .method { display: inline-block; min-width: 56px; font-size: 0.75rem; font-weight: 600; color: var(--accent); }
-.method.POST, .method.PUT { color: #8a5a00; }
+.method.POST, .method.PUT, .method.PATCH { color: #8a5a00; }
 .method.DELETE { color: var(--bad); }
 
 .custom { display: flex; gap: 8px; margin-top: 12px; }

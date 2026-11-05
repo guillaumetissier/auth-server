@@ -507,6 +507,12 @@ domains created, for the users they administer.
 
 They apply at once. Until they are changed there, the values of `.env.docker` apply.
 
+**Resource types** (`/admin/resource-types`, super-administrator; `ROLE_ADMIN` only looks): the kinds of
+resources rights apply to (`vehicle`, `invoice`), and their **facets**, parts of a resource granted on
+their own (`vehicle.pricing:w`: may change the prices only). Declare, describe and remove them; the page
+shows where each is used, and refuses to remove what rights still name. See
+[Domains and rights](docs/domains-and-rights.md#facets).
+
 **Domains** (`/admin`): the tree, with the number of users per domain. On a domain's page: rename it,
 set its owner and owner rights, create subdomains, see and move its users, create a user in it, and
 delete it when it is empty (no user, no subdomain).

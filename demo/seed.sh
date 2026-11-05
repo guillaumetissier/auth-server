@@ -1,5 +1,5 @@
 #!/bin/sh
-# Creates in the auth server what the demo needs: the "my-spa" client, five users (one of them the
+# Creates in the auth server what the demo needs: the "my-spa" client, six users (one of them the
 # super-administrator), domains and rights.
 # Safe to run again: what already exists is kept.
 #
@@ -27,7 +27,7 @@ run league:oauth2-server:create-client my-spa my-spa --public \
 run app:client:policy my-spa '--impersonation-uri=http://localhost:5173/?impersonate={user}' >/dev/null
 
 echo "== Users (password: $PASSWORD)"
-for user in reader:101 manager:102 outsider:103 support:100 admin:1; do
+for user in reader:101 manager:102 outsider:103 pricer:110 support:100 admin:1; do
     name=${user%%:*}
     id=${user##*:}
     run app:user:create "$name" "$id" --password="$PASSWORD" --email="$name@demo.test" >/dev/null 2>&1 && echo "$name created" || echo "$name already exists"
@@ -44,5 +44,5 @@ echo "== Domains and rights"
 run app:access:import "$import_file"
 
 echo
-echo "Done. Open http://localhost:5173 and sign in as reader, manager, outsider or support ($PASSWORD)."
+echo "Done. Open http://localhost:5173 and sign in as reader, manager, pricer, outsider or support ($PASSWORD)."
 echo "Administration: http://localhost:8080, signed in as admin (super-administrator) or support (read-only)."

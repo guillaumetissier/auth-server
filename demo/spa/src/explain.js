@@ -63,6 +63,12 @@ export function explain(result) {
     if (error === 'insufficient_scope') {
       return 'Authenticated, but the token lacks a scope. Scopes are granted to the application (the client), not to the user.';
     }
+    if (error === 'insufficient_rights' && result.body?.denied_facets) {
+      return 'Authenticated, but you may not change these fields: they belong to a facet (a part of the vehicle) you hold no write access to. Facets are declared with the resource types in the auth server, and granted like types ("vehicle.pricing:w").';
+    }
+    if (error === 'insufficient_rights' && result.body?.denied_fields) {
+      return 'Authenticated, but these fields belong to the vehicle itself: write access to the vehicle is needed. A facet right ("vehicle.pricing:w") only lets you change the fields of that facet.';
+    }
     if (error === 'insufficient_rights') {
       return 'Authenticated, but your rights do not allow this. Rights are granted per resource type and domain in the auth server.';
     }

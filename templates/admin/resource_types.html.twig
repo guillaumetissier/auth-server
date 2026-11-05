@@ -4,39 +4,135 @@
 
 {% block content %}
     <h1>Resource types</h1>
-    <p class="sub">The types used in access expressions. An expression naming an undeclared type is refused.</p>
+    <p class="sub">What rights apply to: the data of your applications, and the administration of this server.</p>
 
-    <table>
-        <thead><tr><th>Type</th><th>Label</th><th></th></tr></thead>
+    <h2>Data of your applications</h2>
+    <p class="help">The kinds of resources your applications protect, and their facets: parts of a resource granted on their own
+        (<code>vehicle.pricing:w</code>). Your applications check these rights. An expression naming an undeclared type or facet is refused.</p>
+
+    {% if can_edit %}
+        <div class="actions toolbar">
+            <button type="button" data-open-dialog="type">New type</button>
+            <button type="button" class="secondary" data-open-dialog="facet" {{ types is empty ? 'disabled title="Declare a type first"' }}>New facet</button>
+        </div>
+    {% endif %}
+
+    <table class="resource-types">
+        <thead><tr><th>Type or facet</th><th>Label</th><th>Description</th><th>Status</th>{% if can_edit %}<th class="num">Operations</th>{% endif %}</tr></thead>
         <tbody>
         {% for t in types %}
-            <tr>
-                <td class="expr">{{ t.code }}</td><td>{{ t.label }}</td>
-                <td class="num">{% if can_edit %}
-                    <form method="post" class="inline">
-                        <input type="hidden" name="code" value="{{ t.code }}"><input type="hidden" name="remove" value="1">
-                        <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_resource_type') }}">
-                        <button type="submit" class="small danger">Remove</button>
-                    </form>
-                {% endif %}</td>
-            </tr>
+            {{ _self.row(t.code, t.label, null, usage[t.code] ?? 0, t.facets is not empty, false, can_edit) }}
+            {% for f in t.facets %}
+                {{ _self.row(f.code, f.label, f.description, usage[f.code] ?? 0, false, true, can_edit) }}
+            {% endfor %}
         {% endfor %}
+        {% if types is empty %}
+            <tr><td colspan="{{ can_edit ? 5 : 4 }}" class="muted">No resource type yet{{ can_edit ? ': declare the first one with "New type".' }}</td></tr>
+        {% endif %}
+        </tbody>
+    </table>
+    <p class="help">"In use": named in rights of users, owner rights of domains or ACCESS_DEFAULT_EXPRESSION (for a type, also through its facets).
+        Codes never change: resource servers test them. A type or facet in use, or a type with facets, cannot be removed.</p>
+
+    <h2>Administration rights (built in)</h2>
+    <p class="help">They do not concern the data of your applications: they let a user administer part of this server, on the domain
+        where they are granted (and its subdomains, if granted so). They start with <code>@</code>, are never covered by <code>*</code>
+        (<code>*:m</code> makes nobody an administrator), have no facets and cannot be changed. The platform roles
+        (super-administrator, administrator) are separate: they apply everywhere.</p>
+    {% set builtin = {
+        '@access': {
+            read: 'See the users of the domain and their rights',
+            write: 'Change their rights and membership, never beyond one\'s own rights',
+            example: 'Alice holds <code>vehicle:m @access:w</code> on North (a10) and its subdomains. She gives <code>vehicle.pricing:w</code> to a pricer of her team. She cannot give <code>invoice:r</code>, which she does not hold herself, nor change her own rights or those of the owner of her domain. She sees nothing of South (a11).',
+        },
+        '@domain': {
+            read: 'See the subdomains',
+            write: 'Create subdomains, set their owner and owner rights (within one\'s own rights)',
+            example: 'Alice holds <code>@domain:w</code> on North (a10). She creates "North depot" (a100) under it and makes Bob its owner, with owner rights no greater than her own. She cannot touch South (a11) nor the group (a1).',
+        },
+        '@impersonate': {
+            read: 'Act on behalf of a user of the domain, read-only',
+            write: 'Act on behalf of a user of the domain, with all his rights',
+            example: 'Dan, team leader of North, holds <code>@impersonate:r</code> on a10. To see what a colleague sees in an application, he signs in as him, after giving a reason and a fresh two-factor code; every change is refused, and the impersonation is written to the audit log. He can never impersonate platform staff, nor the owner of his domain or of a domain above.',
+        },
+    } %}
+    <table class="builtin">
+        <thead><tr><th>Right</th><th><code>r</code> (read)</th><th><code>w</code> (write)</th></tr></thead>
+        <tbody>
         {% for code, label in reserved %}
-            <tr><td class="expr">{{ code }}</td><td>{{ label }} <span class="badge">built in</span></td><td></td></tr>
+            {% set info = builtin[code] ?? null %}
+            <tr>
+                <td class="nowrap"><span class="expr">{{ code }}</span>{% if info %}
+                    {# Bubble shown on hover, and on keyboard focus or tap (touch screens have no hover). #}
+                    <span class="tip">
+                        <button type="button" class="help-icon" aria-label="Example for {{ code }}" aria-describedby="example-{{ code|slice(1) }}">?</button>
+                        <span id="example-{{ code|slice(1) }}" role="tooltip" class="tip-bubble">
+                            <strong><span class="expr">{{ code }}</span>, an example.</strong> {{ info.example|raw }}
+                        </span>
+                    </span>
+                {% endif %}</td>
+                <td>{{ info ? info.read : label }}</td>
+                <td>{{ info ? info.write : '' }}</td>
+            </tr>
         {% endfor %}
         </tbody>
     </table>
 
     {% if can_edit %}
-        <h2>Declare a type</h2>
-        <form method="post">
-            <div class="row">
-                <div><label for="rt-code">Code</label><input type="text" id="rt-code" name="code" required pattern="[a-z][a-z0-9_.\-]{0,62}" placeholder="vehicle"></div>
-                <div class="grow"><label for="rt-label">Label</label><input type="text" id="rt-label" name="label" placeholder="Vehicles"></div>
-                <div><button type="submit">Save</button></div>
+        {# One dialog to create a type, create a facet or edit either: scripts/resource-types.js fills it. #}
+        <dialog id="rt-dialog" class="modal" aria-labelledby="rt-dialog-title">
+            <form method="post" id="rt-form">
+                <h2 id="rt-dialog-title">New type</h2>
+                <input type="hidden" name="mode" value="create">
+
+                <div data-for="type">
+                    <label for="rt-code">Code</label>
+                    <input type="text" id="rt-code" name="code" required pattern="[a-z][a-z0-9_\-]{0,62}(\.[a-z][a-z0-9_\-]{0,62})?" placeholder="vehicle">
+                    <p class="help" data-for="type-create">Lowercase letters, digits, "-" and "_", starting with a letter. Cannot be changed later.</p>
+                </div>
+
+                <div data-for="facet-create">
+                    <div class="row">
+                        <div><label for="rt-type">Type</label>
+                            <select id="rt-type" name="type">
+                                {% for t in types %}<option value="{{ t.code }}">{{ t.code }}</option>{% endfor %}
+                            </select></div>
+                        <div><label for="rt-facet">Facet</label>
+                            <input type="text" id="rt-facet" name="facet" required pattern="[a-z][a-z0-9_\-]{0,62}" placeholder="pricing"></div>
+                    </div>
+                    <p class="help">Granted as <code>type.facet</code>. Cannot be changed later.</p>
+                </div>
+
+                <label for="rt-label">Label</label>
+                <input type="text" id="rt-label" name="label" required maxlength="255" placeholder="Vehicles">
+
+                <div data-for="facet">
+                    <label for="rt-description">Description</label>
+                    <input type="text" id="rt-description" name="description" maxlength="255" placeholder="Sale price, discount, crossed-out price">
+                    <p class="help">Which fields belong to the facet is decided by each resource server: describe them for administrators.</p>
+                </div>
+
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_resource_type') }}">
+                <div class="actions">
+                    <button type="submit">Save</button>
+                    <button type="button" class="secondary" data-close-dialog>Cancel</button>
+                </div>
+            </form>
+        </dialog>
+
+        {# Asks before a removal; without the script, the Remove buttons submit directly. #}
+        <dialog id="rt-confirm" class="modal" aria-labelledby="rt-confirm-title">
+            <div class="modal-body">
+                <h2 id="rt-confirm-title">Remove?</h2>
+                <p id="rt-confirm-text"></p>
+                <p class="help">No right names it any more. It can be declared again later with the same code.</p>
+                <div class="actions">
+                    <button type="button" class="danger" data-confirm>Remove</button>
+                    <button type="button" class="secondary" data-close-dialog>Cancel</button>
+                </div>
             </div>
-            <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_resource_type') }}">
-        </form>
+        </dialog>
+        <script src="/scripts/resource-types.js" defer></script>
     {% endif %}
 
     <h2>Writing access expressions</h2>
@@ -46,7 +142,30 @@
         <tr><td class="expr">*:w tire:r</td><td>write everything, but only read tires: a named type beats <code>*</code>, whatever the order</td></tr>
         <tr><td class="expr">*:r invoice:-</td><td>read everything except invoices</td></tr>
         <tr><td class="expr">user:r user:w:own</td><td>read every profile, edit only one's own (<code>:own</code> = resources owned by the user)</td></tr>
-        <tr><td class="expr">@impersonate:r</td><td>reserved types start with <code>@</code> and are never covered by <code>*</code></td></tr>
+        <tr><td class="expr">vehicle.pricing:w</td><td>change the prices of vehicles, and see the vehicles; nothing else (facets take <code>-</code>, <code>r</code> or <code>w</code>)</td></tr>
+        <tr><td class="expr">vehicle:w vehicle.pricing:r</td><td>change everything but the prices: the most specific rule wins (facet, then type, then <code>*</code>)</td></tr>
+        <tr><td class="expr">@impersonate:r</td><td>reserved types start with <code>@</code>, are never covered by <code>*</code> and have no facets</td></tr>
         </tbody>
     </table>
 {% endblock %}
+
+{% macro row(code, label, description, used, has_facets, is_facet, can_edit) %}
+    <tr{% if is_facet %} class="facet"{% endif %}>
+        <td class="nowrap">{% if is_facet %}<span class="muted">↳</span> {% endif %}<span class="expr">{{ code }}</span></td>
+        <td>{{ label }}</td>
+        <td class="muted">{{ description }}</td>
+        <td class="nowrap">{% if used > 0 %}<span class="badge in-use">in use ({{ used }})</span>{% else %}<span class="muted">unused</span>{% endif %}</td>
+        {% if can_edit %}
+            <td class="num nowrap">
+                <button type="button" class="small secondary" data-open-dialog="edit" data-code="{{ code }}" data-label="{{ label }}"
+                        data-description="{{ description }}" data-facet="{{ is_facet ? '1' : '0' }}">Edit</button>
+                {% set reason = used > 0 ? 'Change the rights naming it first' : (has_facets ? 'Remove its facets first' : null) %}
+                <form method="post" class="inline" data-confirm-remove data-code="{{ code }}" data-label="{{ label }}" data-facet="{{ is_facet ? '1' : '0' }}">
+                    <input type="hidden" name="code" value="{{ code }}"><input type="hidden" name="mode" value="remove">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_resource_type') }}">
+                    <button type="submit" class="small danger" {{ reason ? ('disabled title="' ~ reason ~ '"')|raw }}>Remove</button>
+                </form>
+            </td>
+        {% endif %}
+    </tr>
+{% endmacro %}

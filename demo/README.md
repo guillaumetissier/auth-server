@@ -37,14 +37,16 @@ make seed
 This creates in the auth server:
 
 - the application (client) `my-spa`, if it does not exist yet;
-- the resource types `vehicle` and `invoice`;
+- the resource types `vehicle` and `invoice`, and the facets `vehicle.pricing` (the price) and
+  `vehicle.media` (the photos);
 - the domains `a1` (Group) > `a10` (North) > `a100` (North depot), and `a1` > `a11` (South);
-- five users, all with the password **`demo-password`**:
+- six users, all with the password **`demo-password`**:
 
 | User | Id (`sub`) | Domain | Rights | Purpose |
 |---|---|---|---|---|
 | `reader` | 101 | a10 | `vehicle:r` on a10 and subdomains | Reads vehicles of North, nothing else |
 | `manager` | 102 | a10 | `vehicle:m invoice:r` on a10 and subdomains | Manages vehicles, reads invoices of North |
+| `pricer` | 110 | a10 | `vehicle.pricing:w` on a10 and subdomains | Changes the prices of vehicles of North, nothing else (sees the vehicles) |
 | `outsider` | 103 | none | none | Signed in, but allowed nothing |
 | `support` | 100 | none | `ROLE_ADMIN` | Impersonates users, in read-only mode; sees the administration pages without changing anything |
 | `admin` | 1 | none | `ROLE_SUPER_ADMIN` | Changes everything in the administration pages, including **Settings** (if no other account is super-administrator yet) |
@@ -59,9 +61,9 @@ The command can be run again: what already exists is kept. Expected end of the o
 ```
 admin is the super-administrator
 == Domains and rights
- [OK] Imported 2 resource type(s), 4 domain(s), 2 membership(s), 2 grant(s).
+ [OK] Imported 2 resource type(s), 2 facet(s), 4 domain(s), 3 membership(s), 3 grant(s).
 
-Done. Open http://localhost:5173 and sign in as reader, manager, outsider or support (demo-password).
+Done. Open http://localhost:5173 and sign in as reader, manager, pricer, outsider or support (demo-password).
 Administration: http://localhost:8080, signed in as admin (super-administrator) or support (read-only).
 ```
 
@@ -91,16 +93,32 @@ both containers run.
 
 What to expect:
 
-| Request | `reader` | `manager` | `outsider` |
-|---|---|---|---|
-| Public status | 200 | 200 | 200 |
-| Who am I? | 200 | 200 | 200 |
-| List vehicles | 200: V-1001, V-1002 (V-2001 hidden) | 200, level manage | 403 `insufficient_rights` |
-| Vehicle of another domain (V-2001, in a11) | 403: outside your domain | 403: outside your domain | 403: no domain |
-| Create a vehicle | 403: you hold read | 201 (simulated) | 403: no domain |
-| Delete a vehicle | 403: needs manage | 200 (simulated) | 403 |
-| List invoices | 403: no right on invoices | 200: F-0001 | 403 |
-| Export invoices | 403 `insufficient_scope` | 403 `insufficient_scope` | 403 `insufficient_scope` |
+| Request | `reader` | `manager` | `pricer` | `outsider` |
+|---|---|---|---|---|
+| Public status | 200 | 200 | 200 | 200 |
+| Who am I? | 200 | 200 | 200 | 200 |
+| List vehicles | 200: V-1001, V-1002 (V-2001 hidden) | 200, level manage | 200, level read | 403 `insufficient_rights` |
+| Vehicle of another domain (V-2001, in a11) | 403: outside your domain | 403: outside your domain | 403: outside your domain | 403: no domain |
+| Create a vehicle | 403: you hold read | 201 (simulated) | 403: you hold read | 403: no domain |
+| Change the price of a vehicle | 403: needs `vehicle.pricing` | 200 (simulated) | 200 (simulated) | 403 |
+| Change the model of a vehicle | 403: you hold read | 200 (simulated) | 403: the model belongs to the vehicle itself | 403 |
+| Delete a vehicle | 403: needs manage | 200 (simulated) | 403: needs manage | 403 |
+| List invoices | 403: no right on invoices | 200: F-0001 | 403 | 403 |
+| Export invoices | 403 `insufficient_scope` | 403 `insufficient_scope` | 403 `insufficient_scope` | 403 `insufficient_scope` |
+
+### Facets: rights on a part of a vehicle
+
+`pricer` holds `vehicle.pricing:w`: he may change the price of the vehicles of North, and sees them, but
+nothing else. The API decides which fields belong to which facet (`src/Data/Catalog.php`: `price` →
+`pricing`, `photos` → `media`; `model` and `plate` belong to the vehicle itself) and checks a change with
+`Principal::deniedFacets()`. A refused change names the fields and the facets missing.
+
+To try more, sign in to <http://localhost:8080> as `admin`:
+
+- **Resource types**: the facets of `vehicle`, where each is used; declare another one.
+- **Users** › `reader` › **Rights**: grant `vehicle:r vehicle.pricing:-` on `a10`. After **Sign out** and
+  **Sign in** in the SPA, *List vehicles* shows the vehicles without their price: the API hides the fields
+  of facets the user may not read.
 
 To change user, click **Sign out**, then **Sign in**. **Sign out** also closes your session on the auth
 server (you see the SPA reload), so the next sign-in asks for a username and password again.

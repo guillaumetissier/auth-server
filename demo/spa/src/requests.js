@@ -37,6 +37,22 @@ export const requests = [
     hint: 'Needs write access to vehicles in your domain.',
   },
   {
+    id: 'vehicle-price',
+    label: 'Change the price of a vehicle',
+    method: 'PATCH',
+    path: '/api/vehicles/V-1001',
+    body: { price: '13 990 EUR' },
+    hint: 'The price belongs to the facet vehicle.pricing: write on vehicles, or on that facet only.',
+  },
+  {
+    id: 'vehicle-model',
+    label: 'Change the model of a vehicle',
+    method: 'PATCH',
+    path: '/api/vehicles/V-1001',
+    body: { model: 'Renault Clio V' },
+    hint: 'The model belongs to the vehicle itself: a facet right is not enough.',
+  },
+  {
     id: 'vehicle-delete',
     label: 'Delete a vehicle',
     method: 'DELETE',
