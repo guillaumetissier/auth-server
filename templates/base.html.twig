@@ -52,6 +52,31 @@
         .wide button.small, .wide a.button.small { margin: 0; padding: 4px 10px; font-size: .85rem; font-weight: 500; }
         .wide button.danger { background: transparent; color: var(--error); border: 1px solid var(--error); }
         .wide form.inline { display: inline; }
+        .wide .nowrap { white-space: nowrap; }
+        .wide .toolbar { margin: 16px 0 8px; }
+        .wide .badge.in-use { color: var(--accent); border-color: currentColor; }
+        .wide td.num form.inline { margin-left: 4px; }
+        .wide button:disabled { opacity: .45; cursor: not-allowed; }
+        dialog.modal { width: min(520px, calc(100vw - 32px)); padding: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--text); box-shadow: 0 12px 40px rgba(0,0,0,.25); }
+        dialog.modal input[readonly] { background: var(--bg); color: var(--muted); }
+        dialog.modal::backdrop { background: rgba(0,0,0,.45); }
+        dialog.modal form, dialog.modal .modal-body { padding: 20px 22px; }
+        dialog.modal p { margin: 8px 0 0; }
+        .wide dialog.modal button.danger { background: var(--error); color: #fff; border-color: var(--error); }
+        dialog.modal h2 { margin: 0 0 6px; font-size: 1.1rem; }
+        dialog.modal .actions { margin-top: 18px; display: flex; gap: 8px; }
+        [hidden] { display: none !important; }
+        button.help-icon { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; min-width: 0;
+            padding: 0; margin: 0 0 0 6px; border-radius: 50%; font-size: .75rem; font-weight: 700; line-height: 1;
+            background: transparent; color: var(--accent); border: 1px solid currentColor; cursor: help; vertical-align: 1px; }
+        .tip { position: relative; display: inline-block; }
+        .tip-bubble { visibility: hidden; opacity: 0; transition: opacity .12s; position: absolute; z-index: 10; left: -8px; top: calc(100% + 8px);
+            width: min(420px, calc(100vw - 48px)); padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border);
+            background: var(--card); color: var(--text); box-shadow: 0 8px 28px rgba(0,0,0,.2);
+            font-family: inherit; font-size: .88rem; line-height: 1.5; white-space: normal; text-align: left; }
+        .tip-bubble::before { content: ""; position: absolute; top: -6px; left: 14px; width: 10px; height: 10px;
+            background: var(--card); border-left: 1px solid var(--border); border-top: 1px solid var(--border); transform: rotate(45deg); }
+        .tip:hover .tip-bubble, .tip:focus-within .tip-bubble { visibility: visible; opacity: 1; }
         .wide .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
         .wide .row > div { flex: 1 1 160px; }
         .wide .row > div.grow { flex: 3 1 280px; }

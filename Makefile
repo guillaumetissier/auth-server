@@ -52,8 +52,8 @@ client: ## Create a public SPA client: make client ID=my-spa REDIRECT=http://loc
 client-policy: ## make client-policy ID=my-spa FLAG=--require-dpop (--allow-bearer, '--impersonation-uri=https://…?user={user}')
 	$(CONSOLE) app:client:policy $(ID) $(FLAG)
 
-resource-type: ## List resource types, or declare one: make resource-type CODE=vehicle LABEL=Vehicles (FLAG=--remove)
-	$(CONSOLE) app:resource-type $(CODE) $(if $(LABEL),"$(LABEL)") $(FLAG)
+resource-type: ## List types and facets, or declare one: make resource-type CODE=vehicle LABEL=Vehicles, CODE=vehicle.pricing LABEL=Prices DESCRIPTION="Sale price" (FLAG=--remove)
+	$(CONSOLE) app:resource-type $(CODE) $(if $(LABEL),"$(LABEL)") $(if $(DESCRIPTION),--description="$(DESCRIPTION)") $(FLAG)
 
 domain: ## Domain tree; make domain CODE=a10 FLAG='--create="Region 10" --parent=a1' or FLAG='--owner=alice --owner-rights="*:m @access:w"'
 	$(CONSOLE) app:domain $(CODE) $(FLAG)

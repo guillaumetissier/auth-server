@@ -6,7 +6,7 @@
     "require": {
         "php": ">=8.3",
         "ext-openssl": "*",
-        "guillaumetissier/resource-guard": "^0.1",
+        "guillaumetissier/resource-guard": "^0.2",
         "nyholm/psr7": "^1.8",
         "symfony/cache": "7.4.*",
         "symfony/dotenv": "7.4.*",

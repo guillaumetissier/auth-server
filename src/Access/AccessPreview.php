@@ -7,42 +7,47 @@ namespace App\Access;
 use App\Entity\Domain;
 use App\Entity\ResourceType;
 use App\Entity\User;
-use Doctrine\ORM\EntityManagerInterface;
+use GuillaumeTissier\ResourceGuard\Access\AccessControlList;
 use GuillaumeTissier\ResourceGuard\Access\AccessLevel;
 
 /**
- * "What does it give": the effective level of a user per resource type in one domain,
+ * "What does it give": the effective level of a user per resource type and facet in one domain,
  * exactly as resource servers will compute it from his token.
  */
 final readonly class AccessPreview
 {
     public function __construct(
         private AccessResolver $resolver,
-        private EntityManagerInterface $em,
+        private ResourceCatalog $catalog,
     ) {
     }
 
     /**
-     * @return list<array{type: string, label: string, level: AccessLevel, own: AccessLevel, reserved: bool}>
+     * Types, each followed by its facets, then the reserved types.
+     *
+     * @return list<array{type: string, label: string, level: AccessLevel, own: AccessLevel, reserved: bool, facet: bool}>
      */
     public function rows(User $user, Domain $domain): array
     {
         $acl = $this->resolver->aclFor($user);
         $rows = [];
-        foreach ($this->em->getRepository(ResourceType::class)->findBy([], ['code' => 'ASC']) as $type) {
-            $rows[] = $this->row($acl, $type->getCode(), $type->getLabel(), $domain, false);
+        foreach ($this->catalog->types() as $type) {
+            $rows[] = $this->row($acl, $type->getCode(), $type->getLabel(), $domain, false, false);
+            foreach ($type->getFacets() as $facet) {
+                $rows[] = $this->row($acl, $facet->getCode(), $facet->getLabel(), $domain, false, true);
+            }
         }
         foreach (ResourceType::RESERVED as $code => $label) {
-            $rows[] = $this->row($acl, $code, $label, $domain, true);
+            $rows[] = $this->row($acl, $code, $label, $domain, true, false);
         }
 
         return $rows;
     }
 
     /**
-     * @return array{type: string, label: string, level: AccessLevel, own: AccessLevel, reserved: bool}
+     * @return array{type: string, label: string, level: AccessLevel, own: AccessLevel, reserved: bool, facet: bool}
      */
-    private function row(\GuillaumeTissier\ResourceGuard\Access\AccessControlList $acl, string $code, string $label, Domain $domain, bool $reserved): array
+    private function row(AccessControlList $acl, string $code, string $label, Domain $domain, bool $reserved, bool $facet): array
     {
         return [
             'type' => $code,
@@ -50,6 +55,7 @@ final readonly class AccessPreview
             'level' => $acl->levelFor($code, $domain->getPath()),
             'own' => $acl->levelFor($code, $domain->getPath(), true),
             'reserved' => $reserved,
+            'facet' => $facet,
         ];
     }
 }

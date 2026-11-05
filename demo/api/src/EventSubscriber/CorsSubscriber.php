@@ -40,7 +40,7 @@ final class CorsSubscriber implements EventSubscriberInterface
 
         $response = new Response(null, Response::HTTP_NO_CONTENT);
         if ($this->isAllowed($request->headers->get('Origin'))) {
-            $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+            $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
             $response->headers->set('Access-Control-Allow-Headers', 'Authorization, DPoP, Content-Type');
             $response->headers->set('Access-Control-Max-Age', '600');
         }

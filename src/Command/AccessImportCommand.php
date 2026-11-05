@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Command;
 
 use App\Access\AccessManager;
+use App\Access\ResourceCatalog;
 use App\Entity\Domain;
+use App\Entity\ResourceFacet;
 use App\Entity\ResourceType;
 use App\Entity\User;
 use App\Repository\DomainRepository;
@@ -25,7 +27,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  * written, and written in one transaction. Existing entries are updated, nothing is deleted.
  *
  * {
- *   "resource_types": [{"code": "vehicle", "label": "Vehicles"}],
+ *   "resource_types": [{"code": "vehicle", "label": "Vehicles",
+ *                       "facets": [{"code": "pricing", "label": "Prices", "description": "Sale price, discount"}]}],
  *   "domains":  [{"code": "a1", "name": "Group A", "parent": null, "owner": "alice", "owner_rights": "*:m @access:w @domain:w"}],
  *   "members":  [{"user": "alice", "domain": "a1"}],
  *   "grants":   [{"user": "bob", "domain": "a10", "subdomains": true, "rights": "*:r vehicle:w user:w:own"}]
@@ -33,7 +36,9 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *
  * Users are referenced by username ("user") or by their id in the main application ("external_user_id").
  *
- * @phpstan-type TypeRow array{code: string, label: string}
+ * Facets left out of the file, or a description left out, are kept as they are.
+ *
+ * @phpstan-type TypeRow array{code: string, label: string, description: ?string, keepDescription: bool}
  * @phpstan-type DomainRow array{code: string, name: string, parent: ?string, setsOwner: bool, owner: ?User, ownerRights: ?AccessExpression}
  * @phpstan-type MemberRow array{user: User, domain: ?string}
  * @phpstan-type GrantRow array{user: User, domain: string, subdomains: bool, rights: AccessExpression}
@@ -49,6 +54,7 @@ final class AccessImportCommand
         private readonly DomainRepository $domains,
         private readonly UserRepository $users,
         private readonly AccessManager $manager,
+        private readonly ResourceCatalog $catalog,
     ) {
     }
 
@@ -66,11 +72,8 @@ final class AccessImportCommand
         $this->errors = [];
 
         // --- Read and check everything first: typed rows, or errors.
-        $knownTypes = [];
-        foreach ($this->em->getRepository(ResourceType::class)->findAll() as $type) {
-            $knownTypes[$type->getCode()] = true;
-        }
-        $types = $this->resourceTypes($this->items($data, 'resource_types'));
+        $knownTypes = $this->catalog->knownCodes();
+        $types = $this->resourceTypes($this->items($data, 'resource_types'), $knownTypes);
         foreach ($types as $type) {
             $knownTypes[$type['code']] = true;
         }
@@ -113,7 +116,8 @@ final class AccessImportCommand
             return Command::FAILURE;
         }
 
-        $summary = \sprintf('%d resource type(s), %d domain(s), %d membership(s), %d grant(s)', \count($types), \count($domains), \count($members), \count($grants));
+        $facetCount = \count(array_filter($types, static fn (array $t): bool => null !== AccessExpression::parentType($t['code'])));
+        $summary = \sprintf('%d resource type(s), %d facet(s), %d domain(s), %d membership(s), %d grant(s)', \count($types) - $facetCount, $facetCount, \count($domains), \count($members), \count($grants));
         if ($dryRun) {
             $io->success('Dry run, the file is valid: '.$summary.'.');
 
@@ -122,11 +126,15 @@ final class AccessImportCommand
 
         // --- Write, in one transaction.
         $this->em->wrapInTransaction(function () use ($types, $domains, $members, $grants): void {
+            // Types come before their facets in $types.
             foreach ($types as $type) {
-                $existing = $this->em->find(ResourceType::class, $type['code']);
-                null === $existing ? $this->em->persist(new ResourceType($type['code'], $type['label'])) : $existing->setLabel($type['label']);
+                $description = $type['description'];
+                if ($type['keepDescription']) {
+                    $description = $this->em->find(ResourceFacet::class, $type['code'])?->getDescription();
+                }
+                $this->catalog->declare($type['code'], $type['label'], $description);
+                $this->em->flush();
             }
-            $this->em->flush();
 
             foreach ($domains as $row) {
                 $domain = $this->domains->findByCode($row['code']);
@@ -166,20 +174,40 @@ final class AccessImportCommand
     }
 
     /**
+     * Types, each followed by its facets (full codes). Also completes $knownTypes.
+     *
      * @param list<array<string, mixed>> $items
+     * @param array<string, true>        $knownTypes
      *
      * @return list<TypeRow>
      */
-    private function resourceTypes(array $items): array
+    private function resourceTypes(array $items, array &$knownTypes): array
     {
         $rows = [];
         foreach ($items as $i => $item) {
             $code = self::str($item, 'code');
             if (null === $code || 1 !== preg_match(ResourceType::CODE_PATTERN, $code)) {
-                $this->errors[] = \sprintf('resource_types[%d]: invalid code.', $i);
+                $this->errors[] = \sprintf('resource_types[%d]: invalid code (lowercase letters, digits, "-" and "_", no dot).', $i);
                 continue;
             }
-            $rows[] = ['code' => $code, 'label' => self::str($item, 'label') ?? $code];
+            $rows[] = ['code' => $code, 'label' => self::str($item, 'label') ?? $code, 'description' => null, 'keepDescription' => false];
+            $knownTypes[$code] = true;
+
+            foreach ($this->items($item, 'facets', \sprintf('resource_types[%d].', $i)) as $j => $facet) {
+                $name = self::str($facet, 'code');
+                if (null === $name || 1 !== preg_match(ResourceFacet::NAME_PATTERN, $name)) {
+                    $this->errors[] = \sprintf('resource_types[%d].facets[%d]: invalid code.', $i, $j);
+                    continue;
+                }
+                $full = $code.AccessExpression::FACET_SEPARATOR.$name;
+                $rows[] = [
+                    'code' => $full,
+                    'label' => self::str($facet, 'label') ?? $name,
+                    'description' => self::str($facet, 'description'),
+                    'keepDescription' => !\array_key_exists('description', $facet),
+                ];
+                $knownTypes[$full] = true;
+            }
         }
 
         return $rows;
@@ -286,9 +314,10 @@ final class AccessImportCommand
      *
      * @return list<array<string, mixed>>
      */
-    private function items(array $data, string $key): array
+    private function items(array $data, string $key, string $prefix = ''): array
     {
         $items = $data[$key] ?? [];
+        $key = $prefix.$key;
         if (!\is_array($items) || !array_is_list($items)) {
             $this->errors[] = \sprintf('"%s" must be a list.', $key);
 

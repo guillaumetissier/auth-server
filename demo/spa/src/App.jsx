@@ -248,11 +248,11 @@ export default function App() {
                   className="custom"
                   onSubmit={(e) => {
                     e.preventDefault();
-                    run({ ...custom, body: ['POST', 'PUT'].includes(custom.method) ? {} : undefined });
+                    run({ ...custom, body: ['POST', 'PUT', 'PATCH'].includes(custom.method) ? {} : undefined });
                   }}
                 >
                   <select aria-label="Method" value={custom.method} onChange={(e) => setCustom({ ...custom, method: e.target.value })}>
-                    {['GET', 'POST', 'PUT', 'DELETE'].map((m) => <option key={m}>{m}</option>)}
+                    {['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map((m) => <option key={m}>{m}</option>)}
                   </select>
                   <input aria-label="Path" value={custom.path} onChange={(e) => setCustom({ ...custom, path: e.target.value })} />
                   <button disabled={busy}>Send</button>
@@ -322,18 +322,7 @@ function Result({ result, mode }) {
 
       {result.ok && <p className="help" data-testid="explanation">{explain(result)}</p>}
 
-      {result.ok && result.body?.items ? (
-        <table>
-          <thead>
-            <tr>{Object.keys(result.body.items[0]).map((k) => <th key={k}>{k}</th>)}</tr>
-          </thead>
-          <tbody>
-            {result.body.items.map((item) => (
-              <tr key={item.id}>{Object.values(item).map((v, i) => <td key={i}>{String(v)}</td>)}</tr>
-            ))}
-          </tbody>
-        </table>
-      ) : null}
+      {result.ok && result.body?.items ? <ItemsTable items={result.body.items} /> : null}
       {result.ok && result.body?.items && result.body.hidden > 0 && (
         <p className="help">{result.body.hidden} more not shown: you may not read them.</p>
       )}
@@ -347,5 +336,22 @@ function Result({ result, mode }) {
         <pre>{Object.keys(result.sent).length ? JSON.stringify(result.sent, null, 2) : 'none'}</pre>
       </details>
     </div>
+  );
+}
+
+// Items may lack fields the user may not read (a facet he holds no read access to): one column per field seen.
+function ItemsTable({ items }) {
+  const columns = [...new Set(items.flatMap((item) => Object.keys(item)))];
+  return (
+    <table>
+      <thead>
+        <tr>{columns.map((k) => <th key={k}>{k}</th>)}</tr>
+      </thead>
+      <tbody>
+        {items.map((item) => (
+          <tr key={item.id}>{columns.map((k) => <td key={k}>{k in item ? String(item[k]) : '—'}</td>)}</tr>
+        ))}
+      </tbody>
+    </table>
   );
 }

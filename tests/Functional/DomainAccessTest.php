@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional;
 
 use App\Access\AccessManager;
+use App\Access\ResourceCatalog;
 use App\Entity\ClientPolicy;
 use App\Entity\Domain;
 use App\Entity\ResourceType;
@@ -192,6 +193,68 @@ final class DomainAccessTest extends OAuthTestCase
 
         $this->browser->request('GET', '/admin/users/'.$this->user('alice')->getId());
         self::assertSelectorTextContains('.help', 'owner of your domain');
+    }
+
+    public function testFacetRightsAreDelegatedWithinOwnRights(): void
+    {
+        $catalog = static::getContainer()->get(ResourceCatalog::class);
+        $catalog->declare('vehicle.pricing', 'Prices');
+        $catalog->declare('vehicle.media', 'Photos');
+        $this->em()->flush();
+        $this->manager()->grant($this->user('bob'), $this->domain('a10'), AccessExpression::parse('@access:w vehicle.pricing:w'), true, null);
+        $this->loginAs('bob');
+
+        $this->grant('bob', 'dave', 'a100', 'vehicle:r');
+        self::assertSelectorTextContains('.alert.error', 'exceed', 'vehicle:r also reads vehicle.media, which bob cannot');
+
+        $this->grant('bob', 'dave', 'a100', 'vehicle:w');
+        self::assertSelectorTextContains('.alert.error', 'exceed');
+
+        $this->grant('bob', 'dave', 'a100', 'vehicle.pricing:w');
+        self::assertSelectorExists('.alert.ok');
+
+        $this->grant('bob', 'dave', 'a100', 'vehicle.mileage:r');
+        self::assertSelectorTextContains('.alert.error', 'Unknown resource type(s) or facet(s): vehicle.mileage');
+    }
+
+    public function testImportDeclaresFacets(): void
+    {
+        $file = tempnam(sys_get_temp_dir(), 'import');
+        file_put_contents($file, json_encode([
+            'resource_types' => [['code' => 'vehicle', 'label' => 'Vehicles', 'facets' => [
+                ['code' => 'pricing', 'label' => 'Prices', 'description' => 'Sale price'],
+                ['code' => 'media', 'label' => 'Photos'],
+            ]]],
+            'grants' => [['user' => 'dave', 'domain' => 'a100', 'rights' => 'vehicle:r vehicle.pricing:w']],
+        ]));
+
+        $tester = $this->command('app:access:import');
+        $status = $tester->execute(['file' => $file]);
+        unlink($file);
+
+        self::assertSame(0, $status, $tester->getDisplay());
+        self::assertStringContainsString('1 resource type(s), 2 facet(s)', $tester->getDisplay());
+        $known = static::getContainer()->get(ResourceCatalog::class)->knownCodes();
+        self::assertArrayHasKey('vehicle.pricing', $known);
+        self::assertArrayHasKey('vehicle.media', $known);
+    }
+
+    public function testImportRefusesInvalidFacets(): void
+    {
+        $file = tempnam(sys_get_temp_dir(), 'import');
+        file_put_contents($file, json_encode([
+            'resource_types' => [['code' => 'boat', 'facets' => [['code' => 'Hull!']]]],
+            'grants' => [['user' => 'dave', 'domain' => 'a100', 'rights' => 'vehicle.pricing:m']],
+        ]));
+
+        $tester = $this->command('app:access:import');
+        $status = $tester->execute(['file' => $file]);
+        unlink($file);
+
+        self::assertSame(1, $status);
+        self::assertStringContainsString('resource_types[0].facets[0]: invalid code', $tester->getDisplay());
+        self::assertStringContainsString('a facet takes -, r or w', $tester->getDisplay());
+        self::assertNull($this->em()->find(ResourceType::class, 'boat'), 'nothing written');
     }
 
     public function testUserWithoutAdministrationRightsIsRefused(): void

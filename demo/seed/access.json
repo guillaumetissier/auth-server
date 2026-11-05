@@ -1,6 +1,9 @@
 {
   "resource_types": [
-    {"code": "vehicle", "label": "Vehicles"},
+    {"code": "vehicle", "label": "Vehicles", "facets": [
+      {"code": "pricing", "label": "Prices", "description": "price"},
+      {"code": "media", "label": "Photos", "description": "photos"}
+    ]},
     {"code": "invoice", "label": "Invoices"}
   ],
   "domains": [
@@ -11,10 +14,12 @@
   ],
   "members": [
     {"user": "reader", "domain": "a10"},
-    {"user": "manager", "domain": "a10"}
+    {"user": "manager", "domain": "a10"},
+    {"user": "pricer", "domain": "a10"}
   ],
   "grants": [
     {"user": "reader", "domain": "a10", "subdomains": true, "rights": "vehicle:r"},
-    {"user": "manager", "domain": "a10", "subdomains": true, "rights": "vehicle:m invoice:r"}
+    {"user": "manager", "domain": "a10", "subdomains": true, "rights": "vehicle:m invoice:r"},
+    {"user": "pricer", "domain": "a10", "subdomains": true, "rights": "vehicle.pricing:w"}
   ]
 }

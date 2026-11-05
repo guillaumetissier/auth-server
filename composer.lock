@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "fbb3de04815f7b3b8d8c8923faee547e",
+    "content-hash": "393e3c0ff27e6e1e54bb2e3157ea631f",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -1504,16 +1504,16 @@
         },
         {
             "name": "guillaumetissier/resource-guard",
-            "version": "v0.1.0",
+            "version": "v0.2.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/guillaumetissier/resource-guard.git",
-                "reference": "5a57845ac268667b4a7c72b3cdb3385ab018d425"
+                "reference": "1106f666af8d0aa7263b01dcb516bda57d4957c0"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/guillaumetissier/resource-guard/zipball/5a57845ac268667b4a7c72b3cdb3385ab018d425",
-                "reference": "5a57845ac268667b4a7c72b3cdb3385ab018d425",
+                "url": "https://api.github.com/repos/guillaumetissier/resource-guard/zipball/1106f666af8d0aa7263b01dcb516bda57d4957c0",
+                "reference": "1106f666af8d0aa7263b01dcb516bda57d4957c0",
                 "shasum": ""
             },
             "require": {
@@ -1586,7 +1586,7 @@
                 "issues": "https://github.com/guillaumetissier/resource-guard/issues",
                 "source": "https://github.com/guillaumetissier/resource-guard"
             },
-            "time": "2026-10-22T12:41:22+00:00"
+            "time": "2026-11-05T21:20:25+00:00"
         },
         {
             "name": "lcobucci/jwt",

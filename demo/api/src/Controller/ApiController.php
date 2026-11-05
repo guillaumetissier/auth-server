@@ -60,8 +60,68 @@ final class ApiController
             return $this->problem(404, 'not_found', \sprintf('There is no vehicle %s.', $id));
         }
 
-        return $this->deny($this->principal($request), 'vehicle', AccessLevel::Read, $vehicle['domain'], 'read vehicle '.$id)
-            ?? new JsonResponse($vehicle);
+        $principal = $this->principal($request);
+
+        return $this->deny($principal, 'vehicle', AccessLevel::Read, $vehicle['domain'], 'read vehicle '.$id)
+            ?? new JsonResponse($this->visibleFields($principal, $vehicle));
+    }
+
+    /**
+     * Changes some fields of a vehicle (simulated). Model and plate need write access to the vehicle; the
+     * price and the photos need write access to their facet ("vehicle.pricing", "vehicle.media"), which
+     * write access to the vehicle includes unless a facet rule says otherwise.
+     */
+    #[Route('/vehicles/{id}', methods: ['PATCH'])]
+    public function updateVehicle(Request $request, string $id): JsonResponse
+    {
+        $vehicle = Catalog::VEHICLES[$id] ?? null;
+        if (null === $vehicle) {
+            return $this->problem(404, 'not_found', \sprintf('There is no vehicle %s.', $id));
+        }
+        $principal = $this->principal($request);
+        $denied = $this->deny($principal, 'vehicle', AccessLevel::Read, $vehicle['domain'], 'change vehicle '.$id);
+        if (null !== $denied) {
+            return $denied;
+        }
+
+        $changes = json_decode($request->getContent(), true);
+        $editable = ['model', 'plate', ...array_keys(Catalog::VEHICLE_FACETS)];
+        if (!\is_array($changes) || [] === $changes || [] !== array_diff(array_keys($changes), $editable)) {
+            return $this->problem(400, 'invalid_request', \sprintf('Send a JSON object with some of these fields: %s.', implode(', ', $editable)));
+        }
+
+        // Fields of the vehicle itself: write access to the vehicle (a facet right is not enough).
+        $ownFields = array_values(array_diff(array_keys($changes), array_keys(Catalog::VEHICLE_FACETS)));
+        if ([] !== $ownFields && !$principal->can('vehicle', AccessLevel::Write, $vehicle['domain'])) {
+            return $this->problem(403, 'insufficient_rights', \sprintf(
+                'To change %s you need write access to vehicles in %s; you hold %s there.%s',
+                implode(', ', $ownFields),
+                $vehicle['domain'],
+                $principal->accessLevel('vehicle', $vehicle['domain'])->label(),
+                $this->facetHint($principal, $vehicle['domain']),
+            ), ['denied_fields' => $ownFields]);
+        }
+
+        // Fields of facets: write access to each facet. Never ignore a denied field silently.
+        $facets = array_values(array_unique(array_map(static fn (string $field): string => Catalog::VEHICLE_FACETS[$field], array_values(array_intersect(array_keys($changes), array_keys(Catalog::VEHICLE_FACETS))))));
+        $deniedFacets = $principal->deniedFacets('vehicle', $facets, AccessLevel::Write, $vehicle['domain']);
+        if ([] !== $deniedFacets) {
+            $fields = array_keys(array_filter(Catalog::VEHICLE_FACETS, static fn (string $facet, string $field): bool => \in_array($facet, $deniedFacets, true) && \array_key_exists($field, $changes), \ARRAY_FILTER_USE_BOTH));
+
+            return $this->problem(403, 'insufficient_rights', \sprintf(
+                'To change %s you need write access to %s in %s.',
+                implode(', ', $fields),
+                implode(', ', array_map(static fn (string $facet): string => 'vehicle.'.$facet, $deniedFacets)),
+                $vehicle['domain'],
+            ), ['denied_fields' => $fields, 'denied_facets' => array_map(static fn (string $facet): string => 'vehicle.'.$facet, $deniedFacets)]);
+        }
+
+        return new JsonResponse([
+            'updated' => $id,
+            'changes' => $changes,
+            'note' => 'Simulated: nothing is stored.',
+            'by' => $principal->userId,
+        ]);
     }
 
     /** Creates a vehicle in the caller's own domain (simulated). */
@@ -135,7 +195,7 @@ final class ApiController
         foreach ($resources as $resource) {
             $level = $principal->accessLevel($type, $resource['domain']);
             if ($level->includes(AccessLevel::Read)) {
-                $items[] = $resource + ['your_level' => $level->label()];
+                $items[] = ('vehicle' === $type ? $this->visibleFields($principal, $resource) : $resource) + ['your_level' => $level->label()];
             }
         }
 
@@ -153,6 +213,28 @@ final class ApiController
             'hidden' => \count($resources) - \count($items),
             'note' => 'Only the resources of domains where you hold read access are listed.',
         ]);
+    }
+
+    /**
+     * The vehicle without the fields of facets the caller may not read ("vehicle:r vehicle.pricing:-" hides the price).
+     *
+     * @param array<string, string> $vehicle
+     *
+     * @return array<string, string>
+     */
+    private function visibleFields(Principal $principal, array $vehicle): array
+    {
+        $hidden = $principal->deniedFacets('vehicle', array_values(array_unique(Catalog::VEHICLE_FACETS)), AccessLevel::Read, $vehicle['domain']);
+
+        return array_filter($vehicle, static fn (string $field): bool => !\in_array(Catalog::VEHICLE_FACETS[$field] ?? null, $hidden, true), \ARRAY_FILTER_USE_KEY);
+    }
+
+    /** For a caller holding facet rights only: which fields he may change. */
+    private function facetHint(Principal $principal, string $domain): string
+    {
+        $writable = array_keys(array_filter(Catalog::VEHICLE_FACETS, static fn (string $facet): bool => $principal->can('vehicle.'.$facet, AccessLevel::Write, $domain)));
+
+        return [] === $writable ? '' : \sprintf(' You may change: %s.', implode(', ', $writable));
     }
 
     /** A 403 response explaining the missing right, or null when the caller holds it. */
