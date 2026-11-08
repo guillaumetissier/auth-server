@@ -8,6 +8,7 @@ use App\Access\AccessManager;
 use App\Access\AccessPolicy;
 use App\Access\AccessPreview;
 use App\Access\AccessResolver;
+use App\Access\ProfileManager;
 use App\Entity\AccessGrant;
 use App\Repository\DomainRepository;
 use App\Repository\UserRepository;
@@ -27,6 +28,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *   app:access alice --domain=a10             idem, previewed on a10
  *   app:access alice --move=a10               moves alice to domain a10
  *   app:access alice a100 "*:w tire:r" --subdomains   grants (or replaces) her rights on a100
+ *   app:access alice a100 --access-profile=pricer --subdomains    gives her the profile "pricer" on a100
+ *   app:access alice a100 "invoice:-" --access-profile=pricer     idem, adjusted: no invoices
  *   app:access alice a100 --revoke
  */
 #[AsCommand(name: 'app:access', description: 'Shows or changes the domain and the rights of a user')]
@@ -39,6 +42,7 @@ final readonly class AccessCommand
         private AccessPolicy $policy,
         private AccessResolver $resolver,
         private AccessPreview $preview,
+        private ProfileManager $profiles,
     ) {
     }
 
@@ -46,7 +50,8 @@ final readonly class AccessCommand
         SymfonyStyle $io,
         #[Argument('Username')] string $username,
         #[Argument('Domain code of the grant')] ?string $domain = null,
-        #[Argument('Access expression, e.g. "*:w tire:r user:w:own"')] ?string $expression = null,
+        #[Argument('Access expression, e.g. "*:w tire:r user:w:own"; with --profile, its adjustments')] ?string $expression = null,
+        #[Option('Access profile to give (its rights, adjusted by the expression if any)', name: 'access-profile')] ?string $profile = null,
         #[Option('The grant extends to all subdomains')] bool $subdomains = false,
         #[Option('Remove the grant')] bool $revoke = false,
         #[Option('Move the user to this domain ("none": no domain)')] ?string $move = null,
@@ -84,13 +89,19 @@ final readonly class AccessCommand
                 }
                 $io->success(\sprintf('Rights of %s on %s removed.', $username, $grantDomain->getPath()));
             } else {
-                if (null === $expression) {
-                    $io->error('Give the access expression, or --revoke.');
+                if (null === $expression && null === $profile) {
+                    $io->error('Give the access expression, an --access-profile, or --revoke.');
 
                     return Command::INVALID;
                 }
+                $grantProfile = null === $profile ? null : $this->profiles->find($profile);
+                if (null !== $profile && null === $grantProfile) {
+                    $io->error(\sprintf('Unknown profile "%s".', $profile));
+
+                    return Command::FAILURE;
+                }
                 try {
-                    $parsed = AccessExpression::parse($expression);
+                    $parsed = AccessExpression::parse($expression ?? '');
                 } catch (InvalidAccessExpression $e) {
                     $io->error($e->getMessage());
 
@@ -106,8 +117,15 @@ final readonly class AccessCommand
 
                     return Command::FAILURE;
                 }
-                $this->manager->grant($user, $grantDomain, $parsed, $subdomains, null);
-                $io->success(\sprintf('%s: "%s" on %s%s.', $username, $parsed->toString(), $grantDomain->getPath(), $subdomains ? ' and its subdomains' : ''));
+                $grant = $this->manager->grant($user, $grantDomain, $parsed, $subdomains, null, $grantProfile);
+                $io->success(\sprintf(
+                    '%s: %s"%s" on %s%s.',
+                    $username,
+                    null === $grantProfile ? '' : \sprintf('profile %s, ', $grantProfile->getCode()),
+                    $grant->getExpression()->toString(),
+                    $grantDomain->getPath(),
+                    $subdomains ? ' and its subdomains' : '',
+                ));
             }
         }
 
@@ -120,7 +138,12 @@ final readonly class AccessCommand
     {
         $io->writeln(\sprintf('<info>%s</info> belongs to %s', $user->getUsername(), $user->getDomain()?->getPath() ?? 'no domain'));
         $io->table(['Domain', 'Subdomains', 'Rights', 'Origin'], array_merge(
-            array_map(static fn (AccessGrant $g): array => [$g->getDomain()->getPath(), $g->includesSubdomains() ? 'yes' : 'no', $g->getExpression()->toString(), 'grant'], $this->resolver->grantsOf($user)),
+            array_map(static fn (AccessGrant $g): array => [
+                $g->getDomain()->getPath(),
+                $g->includesSubdomains() ? 'yes' : 'no',
+                $g->getExpression()->toString(),
+                null === $g->getProfile() ? 'grant' : \sprintf('profile %s%s', $g->getProfile()->getCode(), $g->getAdjustments()->isEmpty() ? '' : ', adjusted: '.$g->getAdjustments()->toString()),
+            ], $this->resolver->grantsOf($user)),
             array_map(static fn ($d): array => [$d->getPath(), 'yes', $d->getOwnerExpression()->toString(), 'owner'], $this->domains->ownedBy($user)),
             null !== $user->getDomain() && !$this->resolver->defaultExpression()->isEmpty()
                 ? [[$user->getDomain()->getPath(), 'yes', $this->resolver->defaultExpression()->toString(), 'default']] : [],

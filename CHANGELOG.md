@@ -6,6 +6,30 @@ one version number covers the server and its browser client (`packages/oauth-dpo
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-08
+
+### Added
+- Access profiles: named sets of rights ("Pricer": `vehicle.pricing:w`) given to users on a domain. Grants
+  stay linked to their profile, so changing a profile changes the rights of every user who has it, from their
+  next token. A grant can adjust its profile: each of its rules replaces the profile's rule for the same type
+  and scope (`invoice:-`: the profile without invoices). Tokens carry the resulting rights: resource servers
+  are unchanged. `access_profile` table and `access_grant.profile_code` (migration).
+- Profiles pages (`/admin/profiles`): list with use, create, edit, remove (with a confirmation). Changing the
+  rights of a profile given to users first shows the grants whose rights change, before and after, and asks
+  for a confirmation. Super-administrator only; the others look.
+- User page: a profile can be chosen when granting rights, the rights field then adjusting it; the grants
+  show the profile, the adjustments and the resulting rights.
+- `app:profile` / `make profile`; `app:access --access-profile` (`make access PROFILE=…`);
+  `app:access:import` reads `profiles` and grants with `profile`.
+- Audit log entries `access_profile.created|updated|removed`, and a `user.access_changed` webhook per user
+  whose rights a profile change alters.
+- Demo: profiles *Fleet manager* and *Pricer*, given to `manager` and `pricer`.
+
+### Changed
+- A profile still given to users cannot be removed. Profiles count as places where resource types and facets
+  are used.
+
+
 ## [0.5.0] - 2026-11-05
 
 ### Added
@@ -121,7 +145,8 @@ First public version.
 - Quality checks in CI: PHPUnit functional tests, PHPStan at level max, PHP-CS-Fixer, and an end-to-end
   check over real HTTP (`tools/e2e.php`) against the Docker image and MySQL.
 
-[Unreleased]: https://github.com/guillaumetissier/auth-server/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/guillaumetissier/auth-server/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/guillaumetissier/auth-server/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/guillaumetissier/auth-server/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/guillaumetissier/auth-server/compare/v0.2.0...v0.4.0
 [0.2.0]: https://github.com/guillaumetissier/auth-server/compare/v0.1.0...v0.2.0

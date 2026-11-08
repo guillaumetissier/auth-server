@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Access;
 
 use App\Entity\AccessGrant;
+use App\Entity\AccessProfile;
 use App\Entity\Domain;
 use App\Entity\ResourceFacet;
 use App\Entity\ResourceType;
@@ -145,8 +146,8 @@ final readonly class ResourceCatalog
     }
 
     /**
-     * Where a type (or one of its facets) or a facet is named: rights of users, owner rights of domains, and
-     * ACCESS_DEFAULT_EXPRESSION.
+     * Where a type (or one of its facets) or a facet is named: rights of users, profiles, owner rights of
+     * domains, and ACCESS_DEFAULT_EXPRESSION.
      *
      * @return list<string>
      */
@@ -197,7 +198,11 @@ final readonly class ResourceCatalog
         /** @var list<AccessGrant> $grants */
         $grants = $this->em->createQuery('SELECT g, u, d FROM '.AccessGrant::class.' g JOIN g.user u JOIN g.domain d')->getResult();
         foreach ($grants as $grant) {
-            yield [\sprintf('rights of %s on %s', $grant->getUser()->getUsername(), $grant->getDomain()->getPath()), $grant->getExpression()];
+            // Its own rules only: what comes from a profile is reported once, for the profile.
+            yield [\sprintf('rights of %s on %s', $grant->getUser()->getUsername(), $grant->getDomain()->getPath()), $grant->getAdjustments()];
+        }
+        foreach ($this->em->getRepository(AccessProfile::class)->findAll() as $profile) {
+            yield [\sprintf('profile %s', $profile->getCode()), $profile->getExpression()];
         }
         foreach ($this->em->getRepository(Domain::class)->findAll() as $domain) {
             yield [\sprintf('owner rights of domain %s', $domain->getCode()), $domain->getOwnerExpression()];

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional;
 
 use App\Access\AccessManager;
+use App\Access\ProfileManager;
 use App\Access\ResourceCatalog;
 use App\Entity\ClientPolicy;
 use App\Entity\Domain;
@@ -239,6 +240,68 @@ final class DomainAccessTest extends OAuthTestCase
         self::assertArrayHasKey('vehicle.media', $known);
     }
 
+    public function testTokenCarriesTheRightsOfAnAdjustedProfile(): void
+    {
+        $profile = static::getContainer()->get(ProfileManager::class)->save('fleet', 'Fleet', AccessExpression::parse('vehicle:m invoice:r'), null, null, true);
+        $this->em()->flush();
+        $this->manager()->grant($this->user('dave'), $this->domain('a100'), AccessExpression::parse('invoice:-'), true, null, $profile);
+
+        [$tokens, $key] = $this->tokensFor('dave');
+        self::assertContains(['/a1/a10/a100/', true, 'invoice:- vehicle:m'], self::arrayAt(self::jwtClaims(self::stringAt($tokens, 'access_token')), 'acl'));
+        $dave = $this->principal($tokens, $key);
+        self::assertTrue($dave->can('vehicle', AccessLevel::Manage, '/a1/a10/a100/'));
+        self::assertFalse($dave->can('invoice', AccessLevel::Read, '/a1/a10/a100/'));
+    }
+
+    public function testProfilesAreGivenWithinOwnRights(): void
+    {
+        $profiles = static::getContainer()->get(ProfileManager::class);
+        $profiles->save('fleet', 'Fleet', AccessExpression::parse('vehicle:m'), null, null, true);
+        $profiles->save('support', 'Support', AccessExpression::parse('@impersonate:w'), null, null, true);
+        $this->em()->flush();
+        $this->loginAs('alice');
+
+        $this->grantProfile('dave', 'a100', 'support', '');
+        self::assertSelectorTextContains('.alert.error', 'exceed', 'alice cannot impersonate');
+
+        $this->grantProfile('dave', 'a100', 'fleet', '');
+        self::assertSelectorTextContains('.alert.ok', 'profile Fleet: vehicle:m');
+    }
+
+    public function testImportCreatesProfilesAndGivesThem(): void
+    {
+        $file = tempnam(sys_get_temp_dir(), 'import');
+        file_put_contents($file, json_encode([
+            'profiles' => [['code' => 'fleet', 'name' => 'Fleet', 'rights' => 'vehicle:m invoice:r', 'description' => 'Runs the fleet']],
+            'grants' => [
+                ['user' => 'dave', 'domain' => 'a100', 'profile' => 'fleet'],
+                ['user' => 'carla', 'domain' => 'a11', 'profile' => 'fleet', 'rights' => 'invoice:-', 'subdomains' => true],
+            ],
+        ]));
+
+        $tester = $this->command('app:access:import');
+        $status = $tester->execute(['file' => $file]);
+        unlink($file);
+
+        self::assertSame(0, $status, $tester->getDisplay());
+        self::assertStringContainsString('1 profile(s)', $tester->getDisplay());
+        self::assertSame('invoice:r vehicle:m', $this->manager()->findGrant($this->user('dave'), $this->domain('a100'))?->getExpression()->toString());
+        self::assertSame('invoice:- vehicle:m', $this->manager()->findGrant($this->user('carla'), $this->domain('a11'))?->getExpression()->toString());
+    }
+
+    public function testImportRefusesUnknownProfiles(): void
+    {
+        $file = tempnam(sys_get_temp_dir(), 'import');
+        file_put_contents($file, json_encode(['grants' => [['user' => 'dave', 'domain' => 'a100', 'profile' => 'ghost']]]));
+
+        $tester = $this->command('app:access:import');
+        $status = $tester->execute(['file' => $file]);
+        unlink($file);
+
+        self::assertSame(1, $status);
+        self::assertStringContainsString('grants[0]: unknown profile "ghost"', $tester->getDisplay());
+    }
+
     public function testImportRefusesInvalidFacets(): void
     {
         $file = tempnam(sys_get_temp_dir(), 'import');
@@ -356,6 +419,16 @@ final class DomainAccessTest extends OAuthTestCase
         $token = $crawler->filter('form[action$="/grants"] input[name=_csrf_token]')->attr('value');
         $this->browser->request('POST', '/admin/users/'.$this->user($target)->getId().'/grants', [
             'domain' => $domain, 'rights' => $rights, 'subdomains' => '1', '_csrf_token' => $token,
+        ]);
+        $this->browser->followRedirect();
+    }
+
+    private function grantProfile(string $target, string $domain, string $profile, string $rights): void
+    {
+        $crawler = $this->browser->request('GET', '/admin/users/'.$this->user('dave')->getId());
+        $token = $crawler->filter('form[action$="/grants"] input[name=_csrf_token]')->attr('value');
+        $this->browser->request('POST', '/admin/users/'.$this->user($target)->getId().'/grants', [
+            'domain' => $domain, 'profile' => $profile, 'rights' => $rights, 'subdomains' => '1', '_csrf_token' => $token,
         ]);
         $this->browser->followRedirect();
     }

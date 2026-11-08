@@ -23,6 +23,34 @@ sibling `a11`. Platform staff (`ROLE_ADMIN`) usually belong to no domain.
 Resource types are declared once (`make resource-type CODE=vehicle LABEL=Vehicles`, or the administration
 pages): an expression naming an unknown type is refused.
 
+### Profiles
+
+A profile is a named set of rights ("Pricer": `vehicle.pricing:w`, "Fleet manager": `vehicle:m invoice:r`),
+given to users on a domain instead of writing the rights each time. The super-administrator creates and
+changes them (page **Profiles**, or `make profile`); whoever manages the rights of a user can give one,
+within his own rights as always.
+
+```bash
+make profile CODE=fleet-manager NAME="Fleet manager" RIGHTS="vehicle:m invoice:r" DESCRIPTION="Runs the fleet"
+make access USERNAME=bob DOMAIN=a10 PROFILE=fleet-manager FLAG=--subdomains
+make access USERNAME=eve DOMAIN=a10 PROFILE=fleet-manager RIGHTS="invoice:-" FLAG=--subdomains
+make profile CODE=fleet-manager            # the profile and who has it
+```
+
+- **Linked, not copied.** A user keeps a link to his profile: changing the profile changes the rights of
+  every user who has it, from their next token. Before saving such a change, the page lists the grants whose
+  rights change, before and after, and asks for a confirmation. The change is written to the audit log, and
+  a `user.access_changed` webhook is sent per user affected.
+- **Adjustments.** With a profile, the rights of a grant adjust it: each rule replaces the profile's rule
+  for the same type (and scope, `:own`), the others are added. `invoice:-` gives the profile without
+  invoices, `vehicle.pricing:r` caps the prices of a profile with `vehicle:w`. The user page shows the
+  profile, the adjustments and the resulting rights.
+- **Tokens and APIs are unchanged.** The auth server puts the resulting rights in the token, as before:
+  resource servers know nothing of profiles.
+- A profile given to users cannot be removed: change their rights first. Its code never changes; its name,
+  rights and description can.
+- `app:access:import` accepts `"profiles"` and grants with `"profile"` (see below).
+
 ### Facets
 
 A facet is a part of a resource type that is granted on its own: the prices of a vehicle, its photos, its
@@ -111,13 +139,15 @@ make access-import FILE=access.json
 {
   "resource_types": [{"code": "vehicle", "label": "Vehicles",
                       "facets": [{"code": "pricing", "label": "Prices", "description": "Sale price, discount"}]}],
+  "profiles": [{"code": "pricer", "name": "Pricer", "rights": "vehicle.pricing:w"}],
   "domains":  [{"code": "a1", "name": "Group", "parent": null},
                {"code": "a10", "name": "Region 10", "parent": "a1", "owner": "alice", "owner_rights": "*:m @access:w @domain:w"}],
   "members":  [{"user": "alice", "domain": "a10"}, {"external_user_id": "43", "domain": "a10"}],
-  "grants":   [{"user": "bob", "domain": "a10", "subdomains": true, "rights": "*:r vehicle:w"}]
+  "grants":   [{"user": "bob", "domain": "a10", "subdomains": true, "rights": "*:r vehicle:w"},
+               {"user": "eve", "domain": "a10", "subdomains": true, "profile": "pricer", "rights": "invoice:r"}]
 }
 ```
 
 Users must exist first (`make import`). The file is checked completely, then written in one transaction;
 existing entries are updated, nothing is deleted (facets left out of the file, or a description left out,
-stay as they are).
+stay as they are). In a grant with a `profile`, `rights` is optional and adjusts the profile.

@@ -7,9 +7,11 @@ namespace App\Controller;
 use App\Access\AccessManager;
 use App\Access\AccessPreview;
 use App\Access\AccessResolver;
+use App\Access\ProfileManager;
 use App\Account\AccountManager;
 use App\Account\PasswordLinks;
 use App\Entity\AccessGrant;
+use App\Entity\AccessProfile;
 use App\Entity\ClientPolicy;
 use App\Entity\Domain;
 use App\Entity\ResourceType;
@@ -47,6 +49,7 @@ final class AdminUserController extends AbstractAdminController
         private readonly EntityManagerInterface $em,
         private readonly EventDispatcherInterface $dispatcher,
         private readonly ClockInterface $clock,
+        private readonly ProfileManager $profiles,
     ) {
     }
 
@@ -143,6 +146,7 @@ final class AdminUserController extends AbstractAdminController
             'default_expression' => $this->resolver->defaultExpression()->isEmpty() ? null : $this->resolver->defaultExpression()->toString(),
             'change_denial' => $this->policy->rightsChangeDenial($actor, $target),
             'grantable_domains' => $grantable,
+            'profiles' => $this->profiles->profiles(),
             'preview_domain' => $previewDomain,
             'preview' => null !== $previewDomain ? $this->preview->rows($target, $previewDomain) : [],
             'preview_domains' => null === $target->getDomain() ? $this->domains->subtree() : $this->domains->subtree($target->getDomain()),
@@ -238,22 +242,35 @@ final class AdminUserController extends AbstractAdminController
         $domain = $this->findDomain($request->request->getString('domain'));
         $includeSubdomains = $request->request->getBoolean('subdomains');
 
+        $profileCode = $request->request->getString('profile');
+        $profile = '' === $profileCode ? null : $this->profiles->find($profileCode);
+        if ('' !== $profileCode && null === $profile) {
+            throw $this->createNotFoundException();
+        }
+
         try {
+            // Without a profile: the rights. With one: the adjustments of its rights, possibly none.
             $expression = AccessExpression::parse($request->request->getString('rights'));
         } catch (InvalidAccessExpression $e) {
             $this->addFlash('error', $e->getMessage());
 
             return $this->redirectToRoute('app_admin_user', ['id' => $id, 'preview' => $domain->getCode()]);
         }
-        $denial = $expression->isEmpty()
+        $rights = null === $profile ? $expression : AccessProfile::combine($profile->getExpression(), $expression);
+        $denial = $rights->isEmpty()
             ? 'Give at least one rule, or remove the grant.'
-            : $this->policy->grantDenial($actor, $target, $domain, $expression, $includeSubdomains, $this->manager->findGrant($target, $domain));
+            : $this->policy->grantDenial($actor, $target, $domain, $rights, $includeSubdomains, $this->manager->findGrant($target, $domain));
 
         if (null !== $denial) {
             $this->addFlash('error', $denial);
         } else {
-            $this->manager->grant($target, $domain, $expression, $includeSubdomains, $actor);
-            $this->addFlash('success', \sprintf('Rights on %s saved. They apply from the next token of %s.', $domain->getPath(), $target->getUsername()));
+            $this->manager->grant($target, $domain, $expression, $includeSubdomains, $actor, $profile);
+            $this->addFlash('success', \sprintf(
+                'Rights on %s saved%s. They apply from the next token of %s.',
+                $domain->getPath(),
+                null === $profile ? '' : \sprintf(' (profile %s: %s)', $profile->getName(), $rights->toString()),
+                $target->getUsername(),
+            ));
         }
 
         return $this->redirectToRoute('app_admin_user', ['id' => $id, 'preview' => $domain->getCode()]);

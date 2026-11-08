@@ -49,11 +49,14 @@ final readonly class AccessPreview
      */
     private function row(AccessControlList $acl, string $code, string $label, Domain $domain, bool $reserved, bool $facet): array
     {
+        // A facet goes up to write: "manage" (create, delete) concerns the whole resource.
+        $cap = static fn (AccessLevel $level): AccessLevel => $facet && AccessLevel::Manage === $level ? AccessLevel::Write : $level;
+
         return [
             'type' => $code,
             'label' => $label,
-            'level' => $acl->levelFor($code, $domain->getPath()),
-            'own' => $acl->levelFor($code, $domain->getPath(), true),
+            'level' => $cap($acl->levelFor($code, $domain->getPath())),
+            'own' => $cap($acl->levelFor($code, $domain->getPath(), true)),
             'reserved' => $reserved,
             'facet' => $facet,
         ];

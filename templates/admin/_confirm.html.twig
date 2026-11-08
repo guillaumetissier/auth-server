@@ -1,0 +1,12 @@
+{# Confirmation dialog for forms marked with data-confirm-title / data-confirm-text (public/scripts/confirm.js). #}
+<dialog id="confirm-dialog" class="modal" aria-labelledby="confirm-dialog-title">
+    <div class="modal-body">
+        <h2 id="confirm-dialog-title">Are you sure?</h2>
+        <p data-confirm-text></p>
+        <div class="actions">
+            <button type="button" class="danger" data-confirm>{{ confirm_label|default('Remove') }}</button>
+            <button type="button" class="secondary" data-close-dialog>Cancel</button>
+        </div>
+    </div>
+</dialog>
+<script src="/scripts/confirm.js" defer></script>

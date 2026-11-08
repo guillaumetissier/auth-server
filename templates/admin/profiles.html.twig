@@ -1,0 +1,43 @@
+{% extends 'admin/_layout.html.twig' %}
+
+{% block title %}Profiles{% endblock %}
+
+{% block content %}
+    <h1>Profiles</h1>
+    <p class="sub">Named sets of rights ("Pricer", "Fleet manager"), given to users on a domain from their page instead of writing the
+        rights each time. Users stay linked to their profile: changing it changes their rights, from their next token. A user's rights
+        can still adjust his profile ("invoice:-": the profile, without invoices).</p>
+
+    {% if can_edit %}
+        <div class="actions toolbar"><a class="button" href="{{ path('app_admin_profile_new') }}">New profile</a></div>
+    {% endif %}
+
+    <table>
+        <thead><tr><th>Profile</th><th>Rights</th><th>Description</th><th>Status</th>{% if can_edit %}<th class="num">Operations</th>{% endif %}</tr></thead>
+        <tbody>
+        {% for p in profiles %}
+            {% set used = usage[p.code] ?? 0 %}
+            <tr>
+                <td class="nowrap"><a href="{{ path('app_admin_profile', {code: p.code}) }}">{{ p.name }}</a> <span class="muted expr">{{ p.code }}</span></td>
+                <td class="expr">{{ p.expression }}</td>
+                <td class="muted">{{ p.description }}</td>
+                <td class="nowrap">{% if used > 0 %}<span class="badge in-use">given ({{ used }})</span>{% else %}<span class="muted">unused</span>{% endif %}</td>
+                {% if can_edit %}
+                    <td class="num nowrap">
+                        <a class="button small secondary" href="{{ path('app_admin_profile', {code: p.code}) }}">Edit</a>
+                        <form method="post" action="{{ path('app_admin_profile_delete', {code: p.code}) }}" class="inline"
+                              data-confirm-title="Remove the profile {{ p.name }}?" data-confirm-text="Nobody has it any more. It can be created again later.">
+                            <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_profile') }}">
+                            <button type="submit" class="small danger" {{ used > 0 ? 'disabled title="Change the rights of the users who have it first"' }}>Remove</button>
+                        </form>
+                    </td>
+                {% endif %}
+            </tr>
+        {% else %}
+            <tr><td colspan="{{ can_edit ? 5 : 4 }}" class="muted">No profile yet{{ can_edit ? ': create the first one with "New profile".' }}</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    {% if can_edit %}{% include 'admin/_confirm.html.twig' %}{% endif %}
+{% endblock %}

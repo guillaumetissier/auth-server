@@ -79,7 +79,11 @@
             <tr>
                 <td class="expr">{{ g.domain.path }}</td>
                 <td>{{ g.includesSubdomains ? 'yes' : 'no' }}</td>
-                <td class="expr">{{ g.expression }}</td>
+                <td>{% if g.profile %}
+                        <a href="{{ path('app_admin_profile', {code: g.profile.code}) }}" class="badge">{{ g.profile.name }}</a>
+                        {% if not g.adjustments.isEmpty %}<span class="muted">adjusted:</span> <span class="expr">{{ g.adjustments }}</span>{% endif %}
+                        <div class="expr muted">= {{ g.expression }}</div>
+                    {% else %}<span class="expr">{{ g.expression }}</span>{% endif %}</td>
                 <td class="muted">granted{% if g.grantedBy %} by {{ g.grantedBy.username }}{% endif %}, {{ g.updatedAt|date('Y-m-d') }}</td>
                 <td class="num">{% if not change_denial %}
                     <form method="post" action="{{ path('app_admin_user_revoke', {id: target.id, grant: g.id}) }}" class="inline">
@@ -111,10 +115,21 @@
                     <select id="g-domain" name="domain">
                         {% for d in grantable_domains %}<option value="{{ d.code }}">{{ d.path }}</option>{% endfor %}
                     </select></div>
-                <div class="grow"><label for="g-rights">Rights</label><input type="text" id="g-rights" name="rights" class="expr" required placeholder="*:r vehicle:w user:w:own"></div>
+                {% if profiles is not empty %}
+                    <div><label for="g-profile">Profile</label>
+                        <select id="g-profile" name="profile">
+                            <option value="">None</option>
+                            {% for p in profiles %}<option value="{{ p.code }}" title="{{ p.expression }}">{{ p.name }}</option>{% endfor %}
+                        </select></div>
+                {% endif %}
+                <div class="grow"><label for="g-rights">{{ profiles is not empty ? 'Rights, or adjustments of the profile' : 'Rights' }}</label><input type="text" id="g-rights" name="rights" class="expr" {{ profiles is empty ? 'required' }} placeholder="*:r vehicle:w user:w:own"></div>
                 <div><label class="check"><input type="checkbox" name="subdomains" value="1" checked> and subdomains</label></div>
                 <div><button type="submit">Save</button></div>
             </div>
+            {% if profiles is not empty %}
+                <p class="help">With a <a href="{{ path('app_admin_profiles') }}">profile</a>, the rights field adjusts it: each rule replaces the profile's rule for the
+                    same type (<code>invoice:-</code>: the profile, without invoices). The user stays linked to the profile and follows its changes.</p>
+            {% endif %}
             <p class="help">Types: {% for t in resource_types %}<code>{{ t.code }}</code> {% for f in t.facets %}<code title="{{ f.description ?? f.label }}">{{ f.code }}</code> {% endfor %}{% endfor %}{% for code, label in reserved_types %}<code title="{{ label }}">{{ code }}</code> {% endfor %}
                 · <a href="{{ path('app_admin_resource_types') }}">syntax</a>. You can never grant more than you hold yourself.</p>
             <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user') }}">

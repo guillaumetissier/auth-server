@@ -3,7 +3,7 @@ CONSOLE  = $(COMPOSE) exec auth-server php bin/console
 # Without a terminal (cron jobs, scripts).
 CONSOLE_BATCH = $(COMPOSE) exec -T auth-server php bin/console
 
-.PHONY: help secrets up down logs user import 2fa-status role impersonations client client-policy resource-type domain access access-import purge test cs fixcs stan e2e
+.PHONY: help secrets up down logs user import 2fa-status role impersonations client client-policy resource-type profile domain access access-import purge test cs fixcs stan e2e
 
 help: ## List the targets
 	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-14s %s\n", $$1, $$2}'
@@ -58,8 +58,11 @@ resource-type: ## List types and facets, or declare one: make resource-type CODE
 domain: ## Domain tree; make domain CODE=a10 FLAG='--create="Region 10" --parent=a1' or FLAG='--owner=alice --owner-rights="*:m @access:w"'
 	$(CONSOLE) app:domain $(CODE) $(FLAG)
 
-access: ## A user's rights: make access USERNAME=bob [DOMAIN=a10 RIGHTS="*:r vehicle:w" FLAG=--subdomains] (FLAG=--revoke, --move=a10)
-	$(CONSOLE) app:access $(USERNAME) $(DOMAIN) $(if $(RIGHTS),"$(RIGHTS)") $(FLAG)
+access: ## A user's rights: make access USERNAME=bob [DOMAIN=a10 RIGHTS="*:r vehicle:w" PROFILE=pricer FLAG=--subdomains] (FLAG=--revoke, --move=a10)
+	$(CONSOLE) app:access $(USERNAME) $(DOMAIN) $(if $(RIGHTS),"$(RIGHTS)") $(if $(PROFILE),--access-profile=$(PROFILE)) $(FLAG)
+
+profile: ## List profiles, show one, or create/change one: make profile CODE=pricer NAME="Pricer" RIGHTS="vehicle.pricing:w" DESCRIPTION="…" (RIGHTS needs NAME; FLAG=--remove)
+	$(CONSOLE) app:profile $(CODE) $(if $(NAME),"$(NAME)") $(if $(RIGHTS),"$(RIGHTS)") $(if $(DESCRIPTION),--description="$(DESCRIPTION)") $(FLAG)
 
 access-import: ## Import domains and rights: make access-import FILE=access.json (FLAG=--dry-run)
 	$(COMPOSE) cp $(FILE) auth-server:/tmp/access-import.json
