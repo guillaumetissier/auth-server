@@ -6,6 +6,10 @@
     ]},
     {"code": "invoice", "label": "Invoices"}
   ],
+  "profiles": [
+    {"code": "fleet-manager", "name": "Fleet manager", "rights": "vehicle:m invoice:r", "description": "Manages the vehicles, reads the invoices"},
+    {"code": "pricer", "name": "Pricer", "rights": "vehicle.pricing:w", "description": "Changes the prices of the vehicles"}
+  ],
   "domains": [
     {"code": "a1", "name": "Group", "parent": null},
     {"code": "a10", "name": "North", "parent": "a1"},
@@ -19,7 +23,7 @@
   ],
   "grants": [
     {"user": "reader", "domain": "a10", "subdomains": true, "rights": "vehicle:r"},
-    {"user": "manager", "domain": "a10", "subdomains": true, "rights": "vehicle:m invoice:r"},
-    {"user": "pricer", "domain": "a10", "subdomains": true, "rights": "vehicle.pricing:w"}
+    {"user": "manager", "domain": "a10", "subdomains": true, "profile": "fleet-manager"},
+    {"user": "pricer", "domain": "a10", "subdomains": true, "profile": "pricer"}
   ]
 }

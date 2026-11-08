@@ -513,6 +513,11 @@ their own (`vehicle.pricing:w`: may change the prices only). Declare, describe a
 shows where each is used, and refuses to remove what rights still name. See
 [Domains and rights](docs/domains-and-rights.md#facets).
 
+**Profiles** (`/admin/profiles`, super-administrator; the others only look): named sets of rights
+("Pricer", "Fleet manager") given to users from their page, instead of writing the rights each time. Users
+stay linked to their profile and follow its changes (the page shows whose rights change before saving);
+a user's rights can adjust his profile. See [Domains and rights](docs/domains-and-rights.md#profiles).
+
 **Domains** (`/admin`): the tree, with the number of users per domain. On a domain's page: rename it,
 set its owner and owner rights, create subdomains, see and move its users, create a user in it, and
 delete it when it is empty (no user, no subdomain).

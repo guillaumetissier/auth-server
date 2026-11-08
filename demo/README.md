@@ -39,14 +39,15 @@ This creates in the auth server:
 - the application (client) `my-spa`, if it does not exist yet;
 - the resource types `vehicle` and `invoice`, and the facets `vehicle.pricing` (the price) and
   `vehicle.media` (the photos);
+- the profiles *Fleet manager* (`vehicle:m invoice:r`) and *Pricer* (`vehicle.pricing:w`);
 - the domains `a1` (Group) > `a10` (North) > `a100` (North depot), and `a1` > `a11` (South);
 - six users, all with the password **`demo-password`**:
 
 | User | Id (`sub`) | Domain | Rights | Purpose |
 |---|---|---|---|---|
 | `reader` | 101 | a10 | `vehicle:r` on a10 and subdomains | Reads vehicles of North, nothing else |
-| `manager` | 102 | a10 | `vehicle:m invoice:r` on a10 and subdomains | Manages vehicles, reads invoices of North |
-| `pricer` | 110 | a10 | `vehicle.pricing:w` on a10 and subdomains | Changes the prices of vehicles of North, nothing else (sees the vehicles) |
+| `manager` | 102 | a10 | profile *Fleet manager* (`vehicle:m invoice:r`) on a10 and subdomains | Manages vehicles, reads invoices of North |
+| `pricer` | 110 | a10 | profile *Pricer* (`vehicle.pricing:w`) on a10 and subdomains | Changes the prices of vehicles of North, nothing else (sees the vehicles) |
 | `outsider` | 103 | none | none | Signed in, but allowed nothing |
 | `support` | 100 | none | `ROLE_ADMIN` | Impersonates users, in read-only mode; sees the administration pages without changing anything |
 | `admin` | 1 | none | `ROLE_SUPER_ADMIN` | Changes everything in the administration pages, including **Settings** (if no other account is super-administrator yet) |
@@ -61,7 +62,7 @@ The command can be run again: what already exists is kept. Expected end of the o
 ```
 admin is the super-administrator
 == Domains and rights
- [OK] Imported 2 resource type(s), 2 facet(s), 4 domain(s), 3 membership(s), 3 grant(s).
+ [OK] Imported 2 resource type(s), 2 facet(s), 2 profile(s), 4 domain(s), 3 membership(s), 3 grant(s).
 
 Done. Open http://localhost:5173 and sign in as reader, manager, pricer, outsider or support (demo-password).
 Administration: http://localhost:8080, signed in as admin (super-administrator) or support (read-only).
@@ -116,6 +117,9 @@ nothing else. The API decides which fields belong to which facet (`src/Data/Cata
 To try more, sign in to <http://localhost:8080> as `admin`:
 
 - **Resource types**: the facets of `vehicle`, where each is used; declare another one.
+- **Profiles**: change *Pricer* to `vehicle.pricing:w vehicle.media:w`. The page first shows that the rights
+  of `pricer` change, and how; after **Confirm**, **Sign out** and **Sign in** in the SPA, `pricer` may
+  change the photos too.
 - **Users** › `reader` › **Rights**: grant `vehicle:r vehicle.pricing:-` on `a10`. After **Sign out** and
   **Sign in** in the SPA, *List vehicles* shows the vehicles without their price: the API hides the fields
   of facets the user may not read.

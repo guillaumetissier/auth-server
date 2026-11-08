@@ -1,0 +1,58 @@
+{#
+ # Dialog to create or edit a profile (public/scripts/profiles.js), shared by the list and the detail page.
+ # "dialog" (from the controller) opens it at once: an error to correct, or rights of users to confirm.
+ # from: "list" or "detail", the page to come back to.
+ #}
+{% set d = dialog ?? null %}
+{% set v = d ? d.values : {code: '', name: '', rights: '', description: ''} %}
+<dialog id="profile-dialog" class="modal modal-wide" aria-labelledby="profile-dialog-title" {{ d ? 'data-open' }}>
+    <form method="post" action="{{ d and d.mode == 'edit' ? path('app_admin_profile_update', {code: v.code}) : path('app_admin_profile_create') }}"
+          data-create-action="{{ path('app_admin_profile_create') }}" data-edit-action="{{ path('app_admin_profile_update', {code: '__code__'}) }}">
+        <h2 id="profile-dialog-title">{{ d and d.mode == 'edit' ? 'Edit the profile ' ~ v.name : 'New profile' }}</h2>
+
+        {% if d and d.error %}<div class="alert error" data-dialog-message>{{ d.error }}</div>{% endif %}
+
+        {% if d and d.impact is not empty %}
+            <section class="impact" data-dialog-message>
+                <h3>These rights change {{ d.impact|length }} grant(s)</h3>
+                <p class="help">Users keep their adjustments. The new rights apply from each user's next token.</p>
+                <table>
+                    <thead><tr><th>User</th><th>Domain</th><th>Now</th><th>After the change</th></tr></thead>
+                    <tbody>
+                    {% for change in d.impact %}
+                        <tr>
+                            <td>{{ change.grant.user.username }}</td>
+                            <td class="expr">{{ change.grant.domain.path }}{{ change.grant.includesSubdomains ? ' +' : '' }}</td>
+                            <td class="expr muted">{{ change.before }}</td>
+                            <td class="expr">{{ change.after }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </section>
+            <input type="hidden" name="confirmed" value="{{ v.rights }}" data-dialog-message>
+        {% endif %}
+
+        <div class="row">
+            <div class="grow"><label for="p-name">Name</label>
+                <input type="text" id="p-name" name="name" value="{{ v.name }}" required maxlength="255" placeholder="Pricer"></div>
+            <div><label for="p-code">Code</label>
+                <input type="text" id="p-code" name="code" value="{{ v.code }}" required pattern="[a-z][a-z0-9_\-]{0,62}" placeholder="pricer" {{ d and d.mode == 'edit' ? 'readonly' }}></div>
+        </div>
+        <label for="p-rights">Rights</label>
+        <input type="text" id="p-rights" name="rights" class="expr" value="{{ v.rights }}" required placeholder="vehicle.pricing:w">
+        <p class="help">Types: {% for t in resource_types %}<code>{{ t.code }}</code> {% for f in t.facets %}<code title="{{ f.description ?? f.label }}">{{ f.code }}</code> {% endfor %}{% endfor %}{% for code, label in reserved_types %}<code title="{{ label }}">{{ code }}</code> {% endfor %}
+            · <a href="{{ path('app_admin_resource_types') }}">syntax</a>. Only someone holding these rights can give the profile.</p>
+        <label for="p-description">Description</label>
+        <input type="text" id="p-description" name="description" value="{{ v.description }}" maxlength="255" placeholder="Changes the prices of the vehicles">
+
+        <input type="hidden" name="from" value="{{ from }}">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_profile') }}">
+        <div class="actions">
+            <button type="submit">{{ d and d.impact is not empty ? 'Confirm and change ' ~ d.impact|length ~ ' grant(s)' : (d and d.mode == 'edit' ? 'Save' : 'Create') }}</button>
+            <button type="button" class="secondary" data-close-dialog>Cancel</button>
+        </div>
+        {% if d and d.impact is not empty %}<p class="help" data-dialog-message>If you change the rights again, you will see their effect again before saving.</p>{% endif %}
+    </form>
+</dialog>
+<script src="/scripts/profiles.js" defer></script>

@@ -59,6 +59,10 @@
         .wide button:disabled { opacity: .45; cursor: not-allowed; }
         dialog.modal { width: min(520px, calc(100vw - 32px)); padding: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--text); box-shadow: 0 12px 40px rgba(0,0,0,.25); }
         dialog.modal input[readonly] { background: var(--bg); color: var(--muted); }
+        dialog.modal.modal-wide { width: min(760px, calc(100vw - 32px)); }
+        dialog.modal .alert { margin: 10px 0 0; }
+        dialog.modal section.impact { margin: 12px 0 4px; }
+        dialog.modal section.impact h3 { margin: 10px 0 2px; font-size: 1rem; }
         dialog.modal::backdrop { background: rgba(0,0,0,.45); }
         dialog.modal form, dialog.modal .modal-body { padding: 20px 22px; }
         dialog.modal p { margin: 8px 0 0; }
@@ -115,6 +119,8 @@
         .columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 28px; }
         .badge.ok { color: var(--ok); border-color: var(--ok); }
         .badge.warn { color: var(--error); border-color: var(--error); }
+        section.impact { border: 1px solid #d9a400; background: rgba(217,164,0,.07); border-radius: 10px; padding: 4px 16px 12px; margin: 16px 0; }
+        section.impact h2 { margin-top: 12px; }
         section.danger { border: 1px solid var(--error); border-radius: 10px; padding: 4px 16px 16px; margin-top: 28px; }
         section.danger h2 { color: var(--error); }
     </style>

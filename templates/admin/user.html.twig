@@ -9,53 +9,52 @@
         {% if not target.enabled %}<span class="badge warn">disabled</span>{% elseif target.isLocked(now) %}<span class="badge warn">locked</span>{% endif %}
     </h1>
 
-    <div class="columns">
-        <section>
-            <h2>Account</h2>
-            <dl>
-                <dt>User id</dt><dd class="expr">{{ target.externalUserId }}</dd>
-                <dt>E-mail</dt><dd>{{ target.email ?? '—' }}</dd>
-                <dt>Domain</dt><dd>{% if target.domain %}<a href="{{ path('app_admin_domain', {code: target.domain.code}) }}" class="expr">{{ target.domain.path }}</a>{% else %}—{% endif %}</dd>
-                <dt>Two-factor</dt><dd>{% if target.totpEnabledAt %}<span class="badge ok">enabled</span> since {{ target.totpEnabledAt|date('Y-m-d') }}{% else %}<span class="badge warn">not enabled</span>{% if target.twoFactorPostponeCount > 0 %} · postponed {{ target.twoFactorPostponeCount }} time(s){% endif %}{% endif %}</dd>
-                <dt>Status</dt><dd>{% if not target.enabled %}disabled{% elseif target.isLocked(now) %}locked until {{ target.lockedUntil|date('H:i') }} (too many failed sign-ins){% else %}active{% endif %}</dd>
-                <dt>Last sign-in</dt><dd>{{ target.lastLoginAt ? target.lastLoginAt|date('Y-m-d H:i') : 'never' }}</dd>
-                <dt>Created</dt><dd>{{ target.createdAt|date('Y-m-d') }}</dd>
-                {% if target.passwordLinkExpiresAt and target.passwordLinkExpiresAt > now %}<dt>Password link</dt><dd>pending, valid until {{ target.passwordLinkExpiresAt|date('Y-m-d H:i') }}</dd>{% endif %}
-            </dl>
-        </section>
-        <section>
-            {% if account_denial %}
-                <h2>Manage</h2>
-                <p class="help">{{ account_denial }}</p>
-            {% else %}
-                <h2>Edit</h2>
-                <form method="post" action="{{ path('app_admin_user_identity', {id: target.id}) }}">
-                    <label for="a-username">Username</label>
-                    <input type="text" id="a-username" name="username" value="{{ target.username }}" required>
-                    <label for="a-email">E-mail address</label>
-                    <input type="email" id="a-email" name="email" value="{{ target.email }}">
-                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user') }}">
-                    <button type="submit" class="secondary">Save</button>
-                </form>
+    <h2>Account</h2>
+    <dl>
+        <dt>User id</dt><dd class="expr">{{ target.externalUserId }}</dd>
+        <dt>E-mail</dt><dd>{{ target.email ?? '—' }}</dd>
+        <dt>Domain</dt><dd>{% if target.domain %}<a href="{{ path('app_admin_domain', {code: target.domain.code}) }}" class="expr">{{ target.domain.path }}</a>{% else %}—{% endif %}</dd>
+        <dt>Two-factor</dt><dd>{% if target.totpEnabledAt %}<span class="badge ok">enabled</span> since {{ target.totpEnabledAt|date('Y-m-d') }}{% else %}<span class="badge warn">not enabled</span>{% if target.twoFactorPostponeCount > 0 %} · postponed {{ target.twoFactorPostponeCount }} time(s){% endif %}{% endif %}</dd>
+        <dt>Status</dt><dd>{% if not target.enabled %}disabled{% elseif target.isLocked(now) %}locked until {{ target.lockedUntil|date('H:i') }} (too many failed sign-ins){% else %}active{% endif %}</dd>
+        <dt>Last sign-in</dt><dd>{{ target.lastLoginAt ? target.lastLoginAt|date('Y-m-d H:i') : 'never' }}</dd>
+        <dt>Created</dt><dd>{{ target.createdAt|date('Y-m-d') }}</dd>
+        {% if target.passwordLinkExpiresAt and target.passwordLinkExpiresAt > now %}<dt>Password link</dt><dd>pending, valid until {{ target.passwordLinkExpiresAt|date('Y-m-d H:i') }}</dd>{% endif %}
+    </dl>
 
-                <h3>Password</h3>
-                <form method="post" action="{{ path('app_admin_user_password_link', {id: target.id}) }}">
-                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user') }}">
-                    <button type="submit" class="secondary" {{ target.email and target.enabled ? '' : 'disabled' }}>Send a password link</button>
-                    <p class="help">{{ target.email ? 'E-mails ' ~ target.email ~ ' a link to choose a new password. Nobody else ever sees the password.' : 'Add an e-mail address first.' }}</p>
-                </form>
+    {% if account_denial %}
+        <p class="help">{{ account_denial }}</p>
+    {% else %}
+        <div class="actions toolbar">
+            <button type="button" class="secondary" data-dialog="identity-dialog">Edit</button>
+            <form method="post" action="{{ path('app_admin_user_password_link', {id: target.id}) }}" class="inline"
+                  data-confirm-title="Send a password link to {{ target.username }}?" data-confirm-button="Send" data-confirm-danger="0"
+                  data-confirm-text="E-mails {{ target.email }} a link to choose a new password. Nobody else ever sees the password.">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user') }}">
+                <button type="submit" class="secondary" {{ target.email and target.enabled ? '' : 'disabled title="' ~ (target.email ? 'The account is disabled' : 'Add an e-mail address first') ~ '"' }}>Send a password link</button>
+            </form>
+            <form method="post" action="{{ path('app_admin_user_2fa_reset', {id: target.id}) }}" class="inline"
+                  data-confirm-title="Reset the two-factor authentication of {{ target.username }}?" data-confirm-button="Reset"
+                  data-confirm-text="For a lost phone: the user sets it up again at his next sign-in. Check who is asking first: whoever resets it can take over the account with the password.">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user') }}">
+                <button type="submit" class="secondary" {{ target.totpEnabledAt ? '' : 'disabled title="Two-factor authentication is not enabled"' }}>Reset 2FA</button>
+            </form>
+        </div>
 
-                {% if target.totpEnabledAt %}
-                    <h3>Two-factor</h3>
-                    <form method="post" action="{{ path('app_admin_user_2fa_reset', {id: target.id}) }}">
-                        <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user') }}">
-                        <button type="submit" class="secondary">Reset two-factor authentication</button>
-                        <p class="help">For a lost phone: the user sets it up again at his next sign-in. Check who is asking first.</p>
-                    </form>
-                {% endif %}
-            {% endif %}
-        </section>
-    </div>
+        <dialog id="identity-dialog" class="modal" aria-labelledby="identity-dialog-title">
+            <form method="post" action="{{ path('app_admin_user_identity', {id: target.id}) }}">
+                <h2 id="identity-dialog-title">Edit {{ target.username }}</h2>
+                <label for="a-username">Username</label>
+                <input type="text" id="a-username" name="username" value="{{ target.username }}" required>
+                <label for="a-email">E-mail address</label>
+                <input type="email" id="a-email" name="email" value="{{ target.email }}">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user') }}">
+                <div class="actions">
+                    <button type="submit">Save</button>
+                    <button type="button" class="secondary" data-close-dialog>Cancel</button>
+                </div>
+            </form>
+        </dialog>
+    {% endif %}
 
     {% if impersonation_mode %}
         <h2>Impersonate</h2>
@@ -79,10 +78,20 @@
             <tr>
                 <td class="expr">{{ g.domain.path }}</td>
                 <td>{{ g.includesSubdomains ? 'yes' : 'no' }}</td>
-                <td class="expr">{{ g.expression }}</td>
+                <td>{% if g.profile %}
+                        <a href="{{ path('app_admin_profile', {code: g.profile.code}) }}" class="badge">{{ g.profile.name }}</a>
+                        {% if not g.adjustments.isEmpty %}<span class="muted">adjusted:</span> <span class="expr">{{ g.adjustments }}</span>{% endif %}
+                        <div class="expr muted">= {{ g.expression }}</div>
+                    {% else %}<span class="expr">{{ g.expression }}</span>{% endif %}</td>
                 <td class="muted">granted{% if g.grantedBy %} by {{ g.grantedBy.username }}{% endif %}, {{ g.updatedAt|date('Y-m-d') }}</td>
-                <td class="num">{% if not change_denial %}
-                    <form method="post" action="{{ path('app_admin_user_revoke', {id: target.id, grant: g.id}) }}" class="inline">
+                <td class="num nowrap">{% if not change_denial %}
+                    {% if g.domain.code in grantable_domains|map(d => d.code) %}
+                        <button type="button" class="small secondary" data-dialog="grant-dialog"
+                                data-fields="{{ {domain: g.domain.code, profile: g.profile ? g.profile.code : '', rights: g.profile ? g.adjustments.toString : g.expression.toString, subdomains: g.includesSubdomains}|json_encode }}">Edit</button>
+                    {% endif %}
+                    <form method="post" action="{{ path('app_admin_user_revoke', {id: target.id, grant: g.id}) }}" class="inline"
+                          data-confirm-title="Remove the rights of {{ target.username }} on {{ g.domain.path }}?"
+                          data-confirm-text="{{ g.expression.isEmpty ? '' : 'He loses: ' ~ g.expression ~ '. It applies from his next token.' }}">
                         <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user') }}">
                         <button type="submit" class="small danger">Remove</button>
                     </form>
@@ -104,21 +113,42 @@
     {% if change_denial %}
         <p class="help">{{ change_denial }}</p>
     {% elseif grantable_domains is not empty %}
-        <h3>Grant or replace rights</h3>
-        <form method="post" action="{{ path('app_admin_user_grant', {id: target.id}) }}">
-            <div class="row">
-                <div><label for="g-domain">Domain</label>
-                    <select id="g-domain" name="domain">
-                        {% for d in grantable_domains %}<option value="{{ d.code }}">{{ d.path }}</option>{% endfor %}
-                    </select></div>
-                <div class="grow"><label for="g-rights">Rights</label><input type="text" id="g-rights" name="rights" class="expr" required placeholder="*:r vehicle:w user:w:own"></div>
-                <div><label class="check"><input type="checkbox" name="subdomains" value="1" checked> and subdomains</label></div>
-                <div><button type="submit">Save</button></div>
-            </div>
-            <p class="help">Types: {% for t in resource_types %}<code>{{ t.code }}</code> {% for f in t.facets %}<code title="{{ f.description ?? f.label }}">{{ f.code }}</code> {% endfor %}{% endfor %}{% for code, label in reserved_types %}<code title="{{ label }}">{{ code }}</code> {% endfor %}
-                · <a href="{{ path('app_admin_resource_types') }}">syntax</a>. You can never grant more than you hold yourself.</p>
-            <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user') }}">
-        </form>
+        <div class="actions toolbar"><button type="button" data-dialog="grant-dialog">Add</button></div>
+
+        <dialog id="grant-dialog" class="modal modal-wide" aria-labelledby="grant-dialog-title">
+            <form method="post" action="{{ path('app_admin_user_grant', {id: target.id}) }}">
+                <h2 id="grant-dialog-title">Grant or replace rights</h2>
+                <p class="help">One grant per domain: saving on a domain where {{ target.username }} already has rights replaces them.</p>
+                <div class="row">
+                    <div class="grow"><label for="g-domain">Domain</label>
+                        <select id="g-domain" name="domain">
+                            {% for d in grantable_domains %}<option value="{{ d.code }}">{{ d.path }}</option>{% endfor %}
+                        </select></div>
+                    {% if profiles is not empty %}
+                        <div class="grow"><label for="g-profile">Profile</label>
+                            <select id="g-profile" name="profile">
+                                <option value="">None</option>
+                                {% for p in profiles %}<option value="{{ p.code }}" title="{{ p.expression }}">{{ p.name }} ({{ p.expression }})</option>{% endfor %}
+                            </select></div>
+                    {% endif %}
+                </div>
+                <label for="g-rights">{{ profiles is not empty ? 'Rights, or adjustments of the profile' : 'Rights' }}</label>
+                <input type="text" id="g-rights" name="rights" class="expr" {{ profiles is empty ? 'required' }} placeholder="*:r vehicle:w user:w:own">
+                {% if profiles is not empty %}
+                    <p class="help">With a <a href="{{ path('app_admin_profiles') }}">profile</a>, this field adjusts it: each rule replaces the profile's rule for the
+                        same type, the others are added (<code>invoice:-</code>: the profile without invoices; <code>tire:r</code>: the profile and tires).
+                        The user stays linked to the profile and follows its changes.</p>
+                {% endif %}
+                <p class="help">Types: {% for t in resource_types %}<code>{{ t.code }}</code> {% for f in t.facets %}<code title="{{ f.description ?? f.label }}">{{ f.code }}</code> {% endfor %}{% endfor %}{% for code, label in reserved_types %}<code title="{{ label }}">{{ code }}</code> {% endfor %}
+                    · <a href="{{ path('app_admin_resource_types') }}">syntax</a>. You can never grant more than you hold yourself.</p>
+                <label class="check"><input type="checkbox" name="subdomains" value="1" checked> Also on its subdomains</label>
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user') }}">
+                <div class="actions">
+                    <button type="submit">Save</button>
+                    <button type="button" class="secondary" data-close-dialog>Cancel</button>
+                </div>
+            </form>
+        </dialog>
     {% endif %}
 
     {% if preview_domain %}
@@ -179,4 +209,6 @@
             </form>
         </section>
     {% endif %}
+    {% include 'admin/_confirm.html.twig' %}
+    <script src="/scripts/dialogs.js" defer></script>
 {% endblock %}

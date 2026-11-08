@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Access;
 
 use App\Entity\AccessGrant;
+use App\Entity\AccessProfile;
 use App\Entity\Domain;
 use App\Entity\User;
 use App\Event\AccountEvent;
@@ -30,19 +31,24 @@ final readonly class AccessManager
         return $this->em->getRepository(AccessGrant::class)->findOneBy(['user' => $user, 'domain' => $domain]);
     }
 
-    public function grant(User $user, Domain $domain, AccessExpression $expression, bool $includeSubdomains, ?User $actor): AccessGrant
+    /**
+     * @param AccessExpression $expression the rights, or with a profile the adjustments of its rights (may be empty)
+     */
+    public function grant(User $user, Domain $domain, AccessExpression $expression, bool $includeSubdomains, ?User $actor, ?AccessProfile $profile = null): AccessGrant
     {
         $grant = $this->findGrant($user, $domain);
         if (null === $grant) {
-            $grant = new AccessGrant($user, $domain, $expression, $includeSubdomains, $actor);
+            $grant = new AccessGrant($user, $domain, $expression, $includeSubdomains, $actor, $profile);
             $this->em->persist($grant);
         } else {
-            $grant->update($expression, $includeSubdomains, $actor);
+            $grant->update($expression, $includeSubdomains, $actor, $profile);
         }
         $this->em->flush();
 
         $this->notify($user, 'grant', $domain, $actor, [
-            'expression' => $expression->toString(),
+            'expression' => $grant->getExpression()->toString(),
+            'profile' => $profile?->getCode(),
+            'adjustments' => null === $profile ? null : $expression->toString(),
             'include_subdomains' => $includeSubdomains,
         ]);
 

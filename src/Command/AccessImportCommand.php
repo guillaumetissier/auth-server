@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Command;
 
 use App\Access\AccessManager;
+use App\Access\ProfileManager;
 use App\Access\ResourceCatalog;
+use App\Entity\AccessProfile;
 use App\Entity\Domain;
 use App\Entity\ResourceFacet;
 use App\Entity\ResourceType;
@@ -31,7 +33,11 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *                       "facets": [{"code": "pricing", "label": "Prices", "description": "Sale price, discount"}]}],
  *   "domains":  [{"code": "a1", "name": "Group A", "parent": null, "owner": "alice", "owner_rights": "*:m @access:w @domain:w"}],
  *   "members":  [{"user": "alice", "domain": "a1"}],
- *   "grants":   [{"user": "bob", "domain": "a10", "subdomains": true, "rights": "*:r vehicle:w user:w:own"}]
+ *   "profiles": [{"code": "pricer", "name": "Pricer", "rights": "vehicle.pricing:w", "description": "Changes prices"}],
+ *   "grants":   [{"user": "bob", "domain": "a10", "subdomains": true, "rights": "*:r vehicle:w user:w:own"},
+ *                {"user": "eve", "domain": "a10", "subdomains": true, "profile": "pricer", "rights": "invoice:r"}]
+ *
+ * In a grant with a profile, "rights" (optional) adjusts the profile's rights.
  * }
  *
  * Users are referenced by username ("user") or by their id in the main application ("external_user_id").
@@ -41,7 +47,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  * @phpstan-type TypeRow array{code: string, label: string, description: ?string, keepDescription: bool}
  * @phpstan-type DomainRow array{code: string, name: string, parent: ?string, setsOwner: bool, owner: ?User, ownerRights: ?AccessExpression}
  * @phpstan-type MemberRow array{user: User, domain: ?string}
- * @phpstan-type GrantRow array{user: User, domain: string, subdomains: bool, rights: AccessExpression}
+ * @phpstan-type GrantRow array{user: User, domain: string, subdomains: bool, rights: AccessExpression, profile: ?string}
+ * @phpstan-type ProfileRow array{code: string, name: string, rights: AccessExpression, description: ?string}
  */
 #[AsCommand(name: 'app:access:import', description: 'Imports domains, memberships, owners and rights from a JSON file')]
 final class AccessImportCommand
@@ -55,6 +62,7 @@ final class AccessImportCommand
         private readonly UserRepository $users,
         private readonly AccessManager $manager,
         private readonly ResourceCatalog $catalog,
+        private readonly ProfileManager $profiles,
     ) {
     }
 
@@ -101,7 +109,10 @@ final class AccessImportCommand
             }
         }
 
-        $grants = $this->grantRows($this->items($data, 'grants'), $paths, $knownTypes);
+        $profiles = $this->profileRows($this->items($data, 'profiles'), $knownTypes);
+        $knownProfiles = array_fill_keys(array_map(static fn ($p): string => $p->getCode(), $this->profiles->profiles()), true)
+            + array_fill_keys(array_column($profiles, 'code'), true);
+        $grants = $this->grantRows($this->items($data, 'grants'), $paths, $knownTypes, $knownProfiles);
         foreach ($grants as $i => $grant) {
             $path = $memberPath($grant['user']);
             if (null !== $path && !str_starts_with($paths[$grant['domain']], $path)) {
@@ -117,7 +128,7 @@ final class AccessImportCommand
         }
 
         $facetCount = \count(array_filter($types, static fn (array $t): bool => null !== AccessExpression::parentType($t['code'])));
-        $summary = \sprintf('%d resource type(s), %d facet(s), %d domain(s), %d membership(s), %d grant(s)', \count($types) - $facetCount, $facetCount, \count($domains), \count($members), \count($grants));
+        $summary = \sprintf('%d resource type(s), %d facet(s), %d profile(s), %d domain(s), %d membership(s), %d grant(s)', \count($types) - $facetCount, $facetCount, \count($profiles), \count($domains), \count($members), \count($grants));
         if ($dryRun) {
             $io->success('Dry run, the file is valid: '.$summary.'.');
 
@@ -125,7 +136,7 @@ final class AccessImportCommand
         }
 
         // --- Write, in one transaction.
-        $this->em->wrapInTransaction(function () use ($types, $domains, $members, $grants): void {
+        $this->em->wrapInTransaction(function () use ($types, $profiles, $domains, $members, $grants): void {
             // Types come before their facets in $types.
             foreach ($types as $type) {
                 $description = $type['description'];
@@ -133,6 +144,12 @@ final class AccessImportCommand
                     $description = $this->em->find(ResourceFacet::class, $type['code'])?->getDescription();
                 }
                 $this->catalog->declare($type['code'], $type['label'], $description);
+                $this->em->flush();
+            }
+
+            foreach ($profiles as $row) {
+                $existing = $this->profiles->find($row['code']);
+                $this->profiles->save($row['code'], $row['name'], $row['rights'], $row['description'] ?? $existing?->getDescription(), null, null === $existing);
                 $this->em->flush();
             }
 
@@ -164,7 +181,8 @@ final class AccessImportCommand
             }
 
             foreach ($grants as $grant) {
-                $this->manager->grant($grant['user'], $this->domain($grant['domain']), $grant['rights'], $grant['subdomains'], null);
+                $profile = null === $grant['profile'] ? null : $this->profiles->find($grant['profile']);
+                $this->manager->grant($grant['user'], $this->domain($grant['domain']), $grant['rights'], $grant['subdomains'], null, $profile);
             }
         });
 
@@ -284,12 +302,43 @@ final class AccessImportCommand
 
     /**
      * @param list<array<string, mixed>> $items
+     * @param array<string, true>        $knownTypes
+     *
+     * @return list<ProfileRow>
+     */
+    private function profileRows(array $items, array $knownTypes): array
+    {
+        $rows = [];
+        foreach ($items as $i => $item) {
+            $label = \sprintf('profiles[%d]', $i);
+            $code = self::str($item, 'code');
+            if (null === $code || 1 !== preg_match(AccessProfile::CODE_PATTERN, $code)) {
+                $this->errors[] = \sprintf('%s: invalid code.', $label);
+                continue;
+            }
+            $rights = $this->expression($item['rights'] ?? null, $label, $knownTypes);
+            if (null === $rights) {
+                continue;
+            }
+            if ($rights->isEmpty()) {
+                $this->errors[] = \sprintf('%s: give the profile at least one rule.', $label);
+                continue;
+            }
+            $rows[] = ['code' => $code, 'name' => self::str($item, 'name') ?? $code, 'rights' => $rights, 'description' => self::str($item, 'description')];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $items
      * @param array<string, string>      $paths
      * @param array<string, true>        $knownTypes
+     * @param array<string, true>        $knownProfiles
      *
      * @return array<int, GrantRow> keyed by position in the file
      */
-    private function grantRows(array $items, array $paths, array $knownTypes): array
+    private function grantRows(array $items, array $paths, array $knownTypes, array $knownProfiles): array
     {
         $rows = [];
         foreach ($items as $i => $item) {
@@ -300,9 +349,17 @@ final class AccessImportCommand
                 $this->errors[] = \sprintf('%s: unknown domain "%s".', $label, $domain ?? '');
                 continue;
             }
-            $rights = $this->expression($item['rights'] ?? null, $label, $knownTypes);
+            $profile = self::str($item, 'profile');
+            if (null !== $profile && !isset($knownProfiles[$profile])) {
+                $this->errors[] = \sprintf('%s: unknown profile "%s".', $label, $profile);
+                continue;
+            }
+            // With a profile, the rights only adjust it and may be left out.
+            $rights = null !== $profile && !\array_key_exists('rights', $item)
+                ? AccessExpression::parse('')
+                : $this->expression($item['rights'] ?? null, $label, $knownTypes);
             if (null !== $user && null !== $rights) {
-                $rows[$i] = ['user' => $user, 'domain' => $domain, 'subdomains' => true === ($item['subdomains'] ?? false), 'rights' => $rights];
+                $rows[$i] = ['user' => $user, 'domain' => $domain, 'subdomains' => true === ($item['subdomains'] ?? false), 'rights' => $rights, 'profile' => $profile];
             }
         }
 
