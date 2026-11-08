@@ -1,81 +1,40 @@
 {% extends 'admin/_layout.html.twig' %}
 
-{% block title %}{{ profile ? profile.name : 'New profile' }}{% endblock %}
+{% block title %}{{ profile.name }}{% endblock %}
 
 {% block content %}
     <p class="sub"><a href="{{ path('app_admin_profiles') }}">Profiles</a></p>
-    <h1>{{ profile ? profile.name : 'New profile' }}</h1>
+    <h1>{{ profile.name }}</h1>
 
-    {% if impact is not empty %}
-        <section class="impact" role="alert">
-            <h2>These changes affect {{ impact|length }} grant(s)</h2>
-            <p class="help">Users keep their adjustments. The new rights apply from each user's next token.</p>
-            <table>
-                <thead><tr><th>User</th><th>Domain</th><th>Rights now</th><th>Rights after the change</th></tr></thead>
-                <tbody>
-                {% for change in impact %}
-                    <tr>
-                        <td><a href="{{ path('app_admin_user', {id: change.grant.user.id}) }}">{{ change.grant.user.username }}</a></td>
-                        <td class="expr">{{ change.grant.domain.path }}{{ change.grant.includesSubdomains ? ' +' : '' }}</td>
-                        <td class="expr muted">{{ change.before }}</td>
-                        <td class="expr">{{ change.after }}</td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-            <p class="help">Check the new rights below, then confirm, or change them again.</p>
-        </section>
+    <dl class="facts">
+        <dt>Code</dt><dd class="expr">{{ profile.code }}</dd>
+        <dt>Rights</dt><dd class="expr">{{ profile.expression }}</dd>
+        <dt>Description</dt><dd>{{ profile.description ?? '—' }}</dd>
+        <dt>Changed</dt><dd>{{ profile.updatedAt|date('Y-m-d H:i') }}</dd>
+    </dl>
+    {% if can_edit %}
+        <div class="actions">{{ include('admin/_profile_operations.html.twig', {p: profile, used: grants|length}) }}</div>
     {% endif %}
 
-    <form method="post" action="{{ profile ? path('app_admin_profile', {code: profile.code}) : path('app_admin_profile_new') }}">
-        <div class="row">
-            <div class="grow"><label for="p-name">Name</label>
-                <input type="text" id="p-name" name="name" value="{{ values.name }}" required maxlength="255" placeholder="Pricer" {{ can_edit ? '' : 'readonly' }}></div>
-            <div><label for="p-code">Code</label>
-                {% if profile %}
-                    <input type="text" id="p-code" value="{{ values.code }}" readonly>
-                {% else %}
-                    <input type="text" id="p-code" name="code" value="{{ values.code }}" required pattern="[a-z][a-z0-9_\-]{0,62}" placeholder="pricer">
-                {% endif %}</div>
-        </div>
-        <label for="p-rights">Rights</label>
-        <input type="text" id="p-rights" name="rights" class="expr" value="{{ values.rights }}" required placeholder="vehicle.pricing:w" {{ can_edit ? '' : 'readonly' }}>
-        <p class="help">Types: {% for t in resource_types %}<code>{{ t.code }}</code> {% for f in t.facets %}<code title="{{ f.description ?? f.label }}">{{ f.code }}</code> {% endfor %}{% endfor %}{% for code, label in reserved_types %}<code title="{{ label }}">{{ code }}</code> {% endfor %}
-            · <a href="{{ path('app_admin_resource_types') }}">syntax</a>. The profile can only be given by someone holding these rights.</p>
-        <label for="p-description">Description</label>
-        <input type="text" id="p-description" name="description" value="{{ values.description }}" maxlength="255" placeholder="Changes the prices of vehicles" {{ can_edit ? '' : 'readonly' }}>
+    <h2>Given to</h2>
+    <table>
+        <thead><tr><th>User</th><th>Domain</th><th>Adjustments</th><th>Resulting rights</th></tr></thead>
+        <tbody>
+        {% for g in grants %}
+            <tr>
+                <td><a href="{{ path('app_admin_user', {id: g.user.id}) }}">{{ g.user.username }}</a></td>
+                <td class="expr">{{ g.domain.path }}{{ g.includesSubdomains ? ' and subdomains' : '' }}</td>
+                <td class="expr">{{ g.adjustments.isEmpty ? '—' : g.adjustments }}</td>
+                <td class="expr">{{ g.expression }}</td>
+            </tr>
+        {% else %}
+            <tr><td colspan="4" class="muted">Nobody has this profile yet: give it from a user's page (Rights).</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
 
-        {% if can_edit %}
-            <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_profile') }}">
-            {% if impact is not empty %}
-                <input type="hidden" name="confirmed" value="{{ values.rights }}">
-                <div class="actions">
-                    <button type="submit">Confirm and change {{ impact|length }} grant(s)</button>
-                    <a class="button secondary" href="{{ path('app_admin_profile', {code: profile.code}) }}">Cancel</a>
-                </div>
-                <p class="help">If you change the rights again, you will see their effect again before saving.</p>
-            {% else %}
-                <div class="actions"><button type="submit">{{ profile ? 'Save' : 'Create' }}</button></div>
-            {% endif %}
-        {% endif %}
-    </form>
-
-    {% if profile %}
-        <h2>Given to</h2>
-        <table>
-            <thead><tr><th>User</th><th>Domain</th><th>Adjustments</th><th>Resulting rights</th></tr></thead>
-            <tbody>
-            {% for g in grants %}
-                <tr>
-                    <td><a href="{{ path('app_admin_user', {id: g.user.id}) }}">{{ g.user.username }}</a></td>
-                    <td class="expr">{{ g.domain.path }}{{ g.includesSubdomains ? ' and subdomains' : '' }}</td>
-                    <td class="expr">{{ g.adjustments.isEmpty ? '—' : g.adjustments }}</td>
-                    <td class="expr">{{ g.expression }}</td>
-                </tr>
-            {% else %}
-                <tr><td colspan="4" class="muted">Nobody has this profile yet: give it from a user's page (Rights).</td></tr>
-            {% endfor %}
-            </tbody>
-        </table>
+    {% if can_edit %}
+        {{ include('admin/_profile_dialog.html.twig', {from: 'detail'}) }}
+        {% include 'admin/_confirm.html.twig' %}
     {% endif %}
 {% endblock %}

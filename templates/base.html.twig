@@ -59,6 +59,10 @@
         .wide button:disabled { opacity: .45; cursor: not-allowed; }
         dialog.modal { width: min(520px, calc(100vw - 32px)); padding: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--text); box-shadow: 0 12px 40px rgba(0,0,0,.25); }
         dialog.modal input[readonly] { background: var(--bg); color: var(--muted); }
+        dialog.modal.modal-wide { width: min(760px, calc(100vw - 32px)); }
+        dialog.modal .alert { margin: 10px 0 0; }
+        dialog.modal section.impact { margin: 12px 0 4px; }
+        dialog.modal section.impact h3 { margin: 10px 0 2px; font-size: 1rem; }
         dialog.modal::backdrop { background: rgba(0,0,0,.45); }
         dialog.modal form, dialog.modal .modal-body { padding: 20px 22px; }
         dialog.modal p { margin: 8px 0 0; }

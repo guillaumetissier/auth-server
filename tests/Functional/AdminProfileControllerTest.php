@@ -20,27 +20,26 @@ final class AdminProfileControllerTest extends AdminTestCase
     public function testSuperAdministratorCreatesAProfile(): void
     {
         $this->signIn('root');
-        $crawler = $this->browser->request('GET', '/admin/profiles/new');
-        $this->browser->submit($crawler->filter('form')->last()->form(), [
-            'name' => 'Vehicle reader', 'code' => 'vehicle-reader', 'rights' => 'vehicle:r', 'description' => 'Sees the vehicles',
-        ]);
-        self::assertResponseRedirects('/admin/profiles/vehicle-reader');
+        $this->submitDialog('/admin/profiles', ['name' => 'Vehicle reader', 'code' => 'vehicle-reader', 'rights' => 'vehicle:r', 'description' => 'Sees the vehicles']);
+        self::assertResponseRedirects('/admin/profiles');
         $this->browser->followRedirect();
         self::assertSelectorTextContains('.alert.ok', 'Profile "Vehicle reader" created');
-        self::assertSelectorTextContains('table', 'Nobody has this profile yet');
-
-        $this->browser->request('GET', '/admin/profiles');
         self::assertSelectorTextContains('table', 'Vehicle reader');
         self::assertSelectorTextContains('table', 'unused');
+
+        $this->browser->request('GET', '/admin/profiles/vehicle-reader');
+        self::assertSelectorTextContains('dl', 'Sees the vehicles');
+        self::assertSelectorTextContains('table', 'Nobody has this profile yet');
     }
 
     public function testInvalidRightsAreRefusedAndTheFormKept(): void
     {
         $this->signIn('root');
-        $crawler = $this->browser->request('GET', '/admin/profiles/new');
-        $this->browser->submit($crawler->filter('form')->last()->form(), ['name' => 'Tires', 'code' => 'tires', 'rights' => 'tire:r']);
+        $this->submitDialog('/admin/profiles', ['name' => 'Tires', 'code' => 'tires', 'rights' => 'tire:r']);
         self::assertResponseIsSuccessful();
-        self::assertSelectorTextContains('.alert.error', 'Unknown resource type(s) or facet(s): tire');
+        // The dialog comes back open, with the error and what was typed.
+        self::assertSelectorExists('#profile-dialog[data-open]');
+        self::assertSelectorTextContains('#profile-dialog .alert.error', 'Unknown resource type(s) or facet(s): tire');
         self::assertSame('Tires', $this->browser->getCrawler()->filter('#p-name')->attr('value'));
     }
 
@@ -72,15 +71,22 @@ final class AdminProfileControllerTest extends AdminTestCase
         static::getContainer()->get(AccessManager::class)->grant($this->userNamed('reader'), $this->em()->getRepository(Domain::class)->findOneBy(['code' => 'a10']) ?? throw new \LogicException(), AccessExpression::parse(''), true, null, $fleet);
 
         $this->signIn('root');
-        $crawler = $this->browser->request('GET', '/admin/profiles/fleet');
+        $this->browser->request('GET', '/admin/profiles/fleet');
         self::assertSelectorTextContains('table', 'reader');
-        $this->browser->submit($crawler->filter('form')->last()->form(), ['rights' => 'vehicle:w']);
+        $edit = $this->browser->getCrawler()->filter('button[data-open-profile="edit"]');
+        self::assertSame('vehicle:r', $edit->attr('data-rights'));
+
+        // The dialog posts to the profile, as the script sets it.
+        $this->submitDialog('/admin/profiles/fleet', ['code' => 'fleet', 'name' => 'Fleet', 'rights' => 'vehicle:w', 'from' => 'detail'], '/admin/profiles/fleet');
         self::assertResponseIsSuccessful();
-        self::assertSelectorTextContains('section.impact', 'These changes affect 1 grant(s)');
-        self::assertSelectorTextContains('section.impact', 'vehicle:w');
+        self::assertSelectorExists('#profile-dialog[data-open]');
+        self::assertSelectorTextContains('#profile-dialog section.impact', 'These rights change 1 grant(s)');
+        self::assertSelectorTextContains('#profile-dialog section.impact', 'vehicle:w');
+        self::assertSelectorTextContains('#profile-dialog button[type=submit]', 'Confirm and change 1 grant(s)');
         self::assertSame('vehicle:r', $this->profiles()->find('fleet')?->getExpression()->toString(), 'not saved yet');
 
-        $this->browser->submit($this->browser->getCrawler()->filter('form')->last()->form());
+        $this->browser->submit($this->browser->getCrawler()->filter('#profile-dialog form')->form());
+        self::assertResponseRedirects('/admin/profiles/fleet');
         $this->browser->followRedirect();
         self::assertSelectorTextContains('.alert.ok', 'the rights of 1 grant(s) changed');
         $this->em()->clear();
@@ -91,9 +97,8 @@ final class AdminProfileControllerTest extends AdminTestCase
     {
         $this->createProfile('fleet', 'Fleet', 'vehicle:r');
         $this->signIn('root');
-        $crawler = $this->browser->request('GET', '/admin/profiles/fleet');
-        $this->browser->submit($crawler->filter('form')->last()->form(), ['name' => 'Fleet team']);
-        self::assertResponseRedirects('/admin/profiles/fleet');
+        $this->submitDialog('/admin/profiles/fleet', ['code' => 'fleet', 'name' => 'Fleet team', 'rights' => 'vehicle:r']);
+        self::assertResponseRedirects('/admin/profiles');
     }
 
     public function testRemoval(): void
@@ -114,14 +119,28 @@ final class AdminProfileControllerTest extends AdminTestCase
         $this->browser->request('GET', '/admin/profiles');
         self::assertResponseIsSuccessful();
         self::assertSelectorNotExists('form[data-confirm-title]');
+        self::assertSelectorNotExists('#profile-dialog');
+        self::assertSelectorNotExists('[data-open-profile]');
         $this->browser->request('GET', '/admin/profiles/fleet');
         self::assertResponseIsSuccessful();
-        self::assertSelectorNotExists('button[type="submit"]');
+        self::assertSelectorNotExists('#profile-dialog');
 
-        $this->browser->request('GET', '/admin/profiles/new');
+        $this->browser->request('POST', '/admin/profiles', ['code' => 'x', 'name' => 'X', 'rights' => '*:m']);
         self::assertResponseStatusCodeSame(403);
         $this->browser->request('POST', '/admin/profiles/fleet', ['name' => 'X', 'rights' => '*:m']);
         self::assertResponseStatusCodeSame(403);
+    }
+
+    /**
+     * Opens $page and submits its profile dialog to $action, as the script leaves it.
+     *
+     * @param array<string, string> $values
+     */
+    private function submitDialog(string $action, array $values, string $page = '/admin/profiles'): void
+    {
+        $crawler = $this->browser->request('GET', $page);
+        $form = $crawler->filter('#profile-dialog form')->form(null, 'POST');
+        $this->browser->request('POST', $action, $values + $form->getValues());
     }
 
     private function createProfile(string $code, string $name, string $rights): AccessProfile

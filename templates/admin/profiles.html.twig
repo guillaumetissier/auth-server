@@ -9,7 +9,7 @@
         can still adjust his profile ("invoice:-": the profile, without invoices).</p>
 
     {% if can_edit %}
-        <div class="actions toolbar"><a class="button" href="{{ path('app_admin_profile_new') }}">New profile</a></div>
+        <div class="actions toolbar"><button type="button" data-open-profile="create">New profile</button></div>
     {% endif %}
 
     <table>
@@ -23,14 +23,7 @@
                 <td class="muted">{{ p.description }}</td>
                 <td class="nowrap">{% if used > 0 %}<span class="badge in-use">given ({{ used }})</span>{% else %}<span class="muted">unused</span>{% endif %}</td>
                 {% if can_edit %}
-                    <td class="num nowrap">
-                        <a class="button small secondary" href="{{ path('app_admin_profile', {code: p.code}) }}">Edit</a>
-                        <form method="post" action="{{ path('app_admin_profile_delete', {code: p.code}) }}" class="inline"
-                              data-confirm-title="Remove the profile {{ p.name }}?" data-confirm-text="Nobody has it any more. It can be created again later.">
-                            <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_profile') }}">
-                            <button type="submit" class="small danger" {{ used > 0 ? 'disabled title="Change the rights of the users who have it first"' }}>Remove</button>
-                        </form>
-                    </td>
+                    <td class="num nowrap">{{ include('admin/_profile_operations.html.twig', {p: p, used: used}) }}</td>
                 {% endif %}
             </tr>
         {% else %}
@@ -39,5 +32,8 @@
         </tbody>
     </table>
 
-    {% if can_edit %}{% include 'admin/_confirm.html.twig' %}{% endif %}
+    {% if can_edit %}
+        {{ include('admin/_profile_dialog.html.twig', {from: 'list'}) }}
+        {% include 'admin/_confirm.html.twig' %}
+    {% endif %}
 {% endblock %}
