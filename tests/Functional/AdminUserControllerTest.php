@@ -117,6 +117,28 @@ final class AdminUserControllerTest extends AdminTestCase
         self::assertContains(AccountEvent::USER_UPDATED, array_column(self::webhooks(), 'type'));
     }
 
+    public function testAccountAndRightsActionsOpenDialogs(): void
+    {
+        $reader = $this->userNamed('reader');
+        $this->signIn('manager');
+        $crawler = $this->browser->request('GET', '/admin/users/'.$reader->getId());
+
+        // Account: Edit, Send a password link, Reset 2FA on one line; the last two ask first.
+        $toolbar = $crawler->filter('.actions.toolbar')->first();
+        self::assertSame(['Edit', 'Send a password link', 'Reset 2FA'], $toolbar->filter('button')->each(static fn ($b): string => trim($b->text())));
+        self::assertSame('identity-dialog', $toolbar->filter('button')->first()->attr('data-dialog'));
+        self::assertSame('Send', $crawler->filter('form[action$="/password-link"]')->attr('data-confirm-button'));
+        self::assertNotNull($crawler->filter('form[action$="/two-factor/reset"] button')->attr('disabled'), '2FA not enabled');
+        self::assertCount(1, $crawler->filter('#identity-dialog form[action$="/identity"]'));
+
+        // Rights: Add opens the grant dialog; Edit fills it with the grant.
+        self::assertCount(1, $crawler->filter('button[data-dialog="grant-dialog"]:not([data-fields])'));
+        self::assertCount(1, $crawler->filter('#grant-dialog form[action$="/grants"]'));
+        $fields = json_decode((string) $crawler->filter('button[data-dialog="grant-dialog"][data-fields]')->attr('data-fields'), true);
+        self::assertSame(['domain' => 'a10', 'profile' => '', 'rights' => 'vehicle:r', 'subdomains' => false], $fields);
+        self::assertStringContainsString('Remove the rights of reader on /a1/a10/?', (string) $crawler->filter('form[action*="/grants/"]')->attr('data-confirm-title'));
+    }
+
     public function testManagerCannotManageAccountsAboveOrBesideHim(): void
     {
         $this->signIn('manager');
