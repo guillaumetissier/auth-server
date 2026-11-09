@@ -1,0 +1,5 @@
+# Messages of App\Security\UserChecker on the sign-in page (domain "security", with those of Symfony).
+
+account:
+    disabled: 'Dieses Konto ist deaktiviert.'
+    locked: 'Dieses Konto ist vorübergehend gesperrt. Versuchen Sie es später erneut.'

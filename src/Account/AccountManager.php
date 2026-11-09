@@ -11,6 +11,8 @@ use App\Entity\ImpersonationSession;
 use App\Entity\Setting;
 use App\Entity\User;
 use App\Event\AccountEvent;
+use App\I18n\InvalidInput;
+use App\I18n\Text;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use GuillaumeTissier\ResourceGuard\Webhook\WebhookEvent;
@@ -34,24 +36,24 @@ final readonly class AccountManager
     }
 
     /**
-     * @return string|null why this username or e-mail cannot be used by $user (null: a new user)
+     * @return Text|null why this username or e-mail cannot be used by $user (null: a new user)
      */
-    public function identityProblem(string $username, ?string $email, ?User $user = null): ?string
+    public function identityProblem(string $username, ?string $email, ?User $user = null): ?Text
     {
         if ('' === $username || mb_strlen($username) > 180 || 1 !== preg_match('/^[\p{L}\p{N}._@+-]+$/u', $username)) {
-            return 'The username may only contain letters, digits and . _ @ + - (no spaces).';
+            return new Text('account.identity.username_may_only_contain_letters');
         }
         $sameUsername = $this->users->findOneByUsername($username);
         if (null !== $sameUsername && $sameUsername !== $user) {
-            return \sprintf('The username "%s" is already taken.', $username);
+            return new Text('account.identity.username_username_is_already_taken', ['{username}' => $username]);
         }
         if (null !== $email) {
             if (mb_strlen($email) > 180 || false === filter_var($email, \FILTER_VALIDATE_EMAIL)) {
-                return \sprintf('"%s" is not a valid e-mail address.', $email);
+                return new Text('account.identity.email_is_not_valid_e', ['{email}' => $email]);
             }
             $sameEmail = $this->users->findOneBy(['email' => $email]);
             if (null !== $sameEmail && $sameEmail !== $user) {
-                return \sprintf('The e-mail address %s is already used by another account.', $email);
+                return new Text('account.identity.e_mail_address_email_is', ['{email}' => $email]);
             }
         }
 
@@ -64,7 +66,7 @@ final readonly class AccountManager
     public function create(string $username, string $externalUserId, ?string $email, ?Domain $domain, ?User $actor): User
     {
         if (null !== $this->users->findOneBy(['externalUserId' => $externalUserId])) {
-            throw new \InvalidArgumentException(\sprintf('The external user id "%s" is already linked to another account.', $externalUserId));
+            throw new InvalidInput('account.identity.external_user_id_id_is', ['{id}' => $externalUserId]);
         }
         $user = new User($username, $externalUserId);
         $user->setEmail($email);

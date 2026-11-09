@@ -6,6 +6,7 @@ namespace App\Settings;
 
 use App\Entity\Setting;
 use App\Entity\User;
+use App\I18n\Locales;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
@@ -32,6 +33,8 @@ final class SystemSettings implements ResetInterface
     public const REFRESH_TOKEN_TTL = 'tokens.refresh_ttl';
     public const IMPERSONATION_TTL = 'impersonation.session_ttl';
     public const IMPERSONATION_ACCESS_TOKEN_TTL = 'impersonation.access_ttl';
+    /** Language of the interface when neither the user nor the browser gives one. */
+    public const DEFAULT_LOCALE = 'ui.default_locale';
 
     public const TWO_FACTOR_MODES = ['optional', 'grace', 'required'];
 
@@ -62,7 +65,18 @@ final class SystemSettings implements ResetInterface
         #[Autowire('%env(OAUTH_REFRESH_TOKEN_TTL)%')] private readonly string $envRefreshTokenTtl,
         #[Autowire('%env(IMPERSONATION_TTL)%')] private readonly string $envImpersonationTtl,
         #[Autowire('%env(IMPERSONATION_ACCESS_TOKEN_TTL)%')] private readonly string $envImpersonationAccessTokenTtl,
+        #[Autowire('%env(APP_DEFAULT_LOCALE)%')] private readonly string $envDefaultLocale,
     ) {
+    }
+
+    /**
+     * Language of the interface for whoever has no language of his own nor a browser language we offer.
+     */
+    public function defaultLocale(): string
+    {
+        $locale = $this->row(self::DEFAULT_LOCALE)?->getValue() ?? $this->envDefaultLocale;
+
+        return Locales::isEnabled($locale) ? $locale : 'en';
     }
 
     public function dpopRequiredByDefault(): bool
@@ -178,6 +192,7 @@ final class SystemSettings implements ResetInterface
             self::REFRESH_TOKEN_TTL => $this->envRefreshTokenTtl,
             self::IMPERSONATION_TTL => $this->envImpersonationTtl,
             self::IMPERSONATION_ACCESS_TOKEN_TTL => $this->envImpersonationAccessTokenTtl,
+            self::DEFAULT_LOCALE => Locales::isEnabled($this->envDefaultLocale) ? $this->envDefaultLocale : 'en',
         ];
     }
 

@@ -80,15 +80,15 @@ final class AdminProfileControllerTest extends AdminTestCase
         $this->submitDialog('/admin/profiles/fleet', ['code' => 'fleet', 'name' => 'Fleet', 'rights' => 'vehicle:w', 'from' => 'detail'], '/admin/profiles/fleet');
         self::assertResponseIsSuccessful();
         self::assertSelectorExists('#profile-dialog[data-open]');
-        self::assertSelectorTextContains('#profile-dialog section.impact', 'These rights change 1 grant(s)');
+        self::assertSelectorTextContains('#profile-dialog section.impact', 'These rights change 1 grant');
         self::assertSelectorTextContains('#profile-dialog section.impact', 'vehicle:w');
-        self::assertSelectorTextContains('#profile-dialog button[type=submit]', 'Confirm and change 1 grant(s)');
+        self::assertSelectorTextContains('#profile-dialog button[type=submit]', 'Confirm and change 1 grant');
         self::assertSame('vehicle:r', $this->profiles()->find('fleet')?->getExpression()->toString(), 'not saved yet');
 
         $this->browser->submit($this->browser->getCrawler()->filter('#profile-dialog form')->form());
         self::assertResponseRedirects('/admin/profiles/fleet');
         $this->browser->followRedirect();
-        self::assertSelectorTextContains('.alert.ok', 'the rights of 1 grant(s) changed');
+        self::assertSelectorTextContains('.alert.ok', 'the rights of 1 grant changed');
         $this->em()->clear();
         self::assertSame('vehicle:w', $this->profiles()->find('fleet')?->getExpression()->toString());
     }

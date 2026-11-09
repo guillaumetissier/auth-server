@@ -1,25 +1,25 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Choose a password{% endblock %}
+{% block title %}{{ 'password.set.choose_password'|trans }}{% endblock %}
 
 {% block body %}
     {% if user is null %}
-        <h1>Link not valid</h1>
-        <p class="sub">This link has expired or was already used. Ask for a new one.</p>
-        <a class="button" href="{{ path('app_password_forgot') }}">Ask for a new link</a>
+        <h1>{{ 'password.set.link_not_valid'|trans }}</h1>
+        <p class="sub">{{ 'password.set.link_has_expired_or_was'|trans }}</p>
+        <a class="button" href="{{ path('app_password_forgot') }}">{{ 'password.set.ask_for_new_link'|trans }}</a>
     {% else %}
-        <h1>Choose a password</h1>
-        <p class="sub">For the account <strong>{{ user.username }}</strong>. At least {{ min_length }} characters: a sentence of a few words is easy to remember and hard to guess.</p>
-        {% if error %}<div class="alert error" role="alert">{{ error }}</div>{% endif %}
+        <h1>{{ 'password.set.choose_password'|trans }}</h1>
+        <p class="sub">{{ 'password.set.for_account_username_at_least'|trans({'{username}': user.username|e, '{min}': min_length})|raw }}</p>
+        {% if error %}<div class="alert error" role="alert">{{ error|trans }}</div>{% endif %}
         <form method="post">
             {# Lets password managers save the password for the right account. #}
             <input type="text" name="username" value="{{ user.username }}" autocomplete="username" hidden>
-            <label for="password">New password</label>
+            <label for="password">{{ 'password.set.new_password'|trans }}</label>
             <input type="password" id="password" name="password" minlength="{{ min_length }}" autocomplete="new-password" required autofocus>
-            <label for="confirmation">New password again</label>
+            <label for="confirmation">{{ 'common.new_password_again'|trans }}</label>
             <input type="password" id="confirmation" name="confirmation" minlength="{{ min_length }}" autocomplete="new-password" required>
             <input type="hidden" name="_csrf_token" value="{{ csrf_token('password_set') }}">
-            <button type="submit">Save the password</button>
+            <button type="submit">{{ 'password.set.save_password'|trans }}</button>
         </form>
     {% endif %}
 {% endblock %}

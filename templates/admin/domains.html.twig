@@ -1,16 +1,16 @@
 {% extends 'admin/_layout.html.twig' %}
 
-{% block title %}Domains{% endblock %}
+{% block title %}{{ 'common.domains'|trans }}{% endblock %}
 
 {% block content %}
-    <h1>Domains</h1>
-    <p class="sub">Users only reach their own domain and its subdomains, never a parent or a sibling.</p>
+    <h1>{{ 'common.domains'|trans }}</h1>
+    <p class="sub">{{ 'admin.domains.users_only_reach_their_own'|trans }}</p>
 
     {% if domains is empty %}
-        <p class="muted">No domain yet.</p>
+        <p class="muted">{{ 'admin.domains.no_domain_yet'|trans }}</p>
     {% else %}
         <table>
-            <thead><tr><th>Domain</th><th>Name</th><th class="num">Users</th><th>Owner</th><th>Owner rights</th><th>Created</th></tr></thead>
+            <thead><tr><th>{{ 'common.domain'|trans }}</th><th>{{ 'common.name'|trans }}</th><th class="num">{{ 'common.users'|trans }}</th><th>{{ 'admin.owner'|trans }}</th><th>{{ 'admin.owner_rights'|trans }}</th><th>{{ 'common.created'|trans }}</th></tr></thead>
             <tbody>
             {% set base = domains|first.depth %}
             {% for d in domains %}
@@ -20,7 +20,7 @@
                     <td class="num">{{ members[d.id] ?? 0 }}</td>
                     <td>{{ d.owner ? d.owner.username : '—' }}</td>
                     <td class="expr">{{ d.ownerExpression }}</td>
-                    <td>{{ d.createdAt|date('Y-m-d') }}</td>
+                    <td>{{ d.createdAt|locale_date }}</td>
                 </tr>
             {% endfor %}
             </tbody>
@@ -28,7 +28,7 @@
     {% endif %}
 
     {% if can_create_root %}
-        <h2>New top-level domain</h2>
+        <h2>{{ 'admin.domains.new_top_level_domain'|trans }}</h2>
         {% include 'admin/_domain_form.html.twig' with {parent: null} %}
     {% endif %}
 {% endblock %}

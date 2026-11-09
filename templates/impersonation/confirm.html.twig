@@ -1,33 +1,32 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Act on behalf of {{ target.username }}{% endblock %}
+{% block title %}{{ 'impersonation.confirm.act_on_behalf_username'|trans({'{username}': target.username}) }}{% endblock %}
 
 {% block body %}
-    <h1>Act on behalf of {{ target.username }}</h1>
+    <h1>{{ 'impersonation.confirm.act_on_behalf_username'|trans({'{username}': target.username}) }}</h1>
     <p class="sub">
         {% if mode == 'full' %}
-            You will have <strong>all the rights</strong> of this user
+            {{ 'impersonation.confirm.you_will_have_all_rights'|trans({'{minutes}': ttl_minutes})|raw }}
         {% else %}
-            You will have <strong>read-only</strong> access as this user
+            {{ 'impersonation.confirm.you_will_have_read_only'|trans({'{minutes}': ttl_minutes})|raw }}
         {% endif %}
-        for at most {{ ttl_minutes }} minutes. Everything you do is recorded under your name.
     </p>
 
     {% for error in errors %}
-        <div class="alert error" role="alert">{{ error }}</div>
+        <div class="alert error" role="alert">{{ error|trans }}</div>
     {% endfor %}
 
     <form method="post">
-        <label for="reason">Reason (ticket, request…)</label>
+        <label for="reason">{{ 'impersonation.confirm.reason_ticket_request'|trans }}</label>
         <input type="text" id="reason" name="reason" value="{{ reason }}" minlength="10" maxlength="500" required autofocus>
 
-        <label for="code">Your authentication code</label>
+        <label for="code">{{ 'impersonation.confirm.authentication_code'|trans }}</label>
         <input type="text" id="code" name="code" class="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
                autocomplete="one-time-code" required>
 
         <input type="hidden" name="_csrf_token" value="{{ csrf_token('impersonation_confirm') }}">
-        <button type="submit">Start</button>
+        <button type="submit">{{ 'impersonation.confirm.start'|trans }}</button>
     </form>
 
-    <p class="links"><a href="{{ path('app_account') }}">Cancel</a></p>
+    <p class="links"><a href="{{ path('app_account') }}">{{ 'common.cancel'|trans }}</a></p>
 {% endblock %}

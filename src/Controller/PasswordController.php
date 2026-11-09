@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\Account\AccountManager;
 use App\Account\PasswordLinks;
 use App\Account\PasswordRules;
+use App\I18n\Text;
 use App\Repository\UserRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -69,13 +70,13 @@ final class PasswordController extends AbstractController
 
         if (null !== $user && $request->isMethod('POST')) {
             if (!$this->isCsrfTokenValid('password_set', $request->request->getString('_csrf_token'))) {
-                $error = 'Your session expired, please try again.';
+                $error = new Text('common.session_expired_please_try_again');
             } else {
                 $password = $request->request->getString('password');
                 $error = PasswordRules::problem($password, $request->request->getString('confirmation'));
                 if (null === $error) {
                     $this->accounts->changePassword($user, $password);
-                    $this->addFlash('success', 'Your password is saved. Sign in with it.');
+                    $this->addFlash('success', new Text('password.password_is_saved_sign_in'));
 
                     return $this->redirectToRoute('app_login');
                 }

@@ -466,6 +466,30 @@ to the other pages.
   A new password (through a password link) unlocks it.
 - **Changing the password** ends your other sessions, and your applications must sign you in again.
 
+### Languages
+
+The pages and the e-mails exist in English, French, German and Spanish. The language is, in this order:
+
+1. the one chosen with the links at the bottom of every page, for the rest of the session;
+2. the one chosen in **My profile** (**Language**), from the next sign-in on; e-mails (password links,
+   invitations) go out in this language;
+3. the language of the browser, when it is one of the four;
+4. the default language of **Settings** (`APP_DEFAULT_LOCALE`, English to begin with).
+
+The error codes of the OAuth protocol, the command line and the audit log stay in English. The texts are
+in `translations/messages+intl-icu.{en,fr,de,es}.yaml`, by key, grouped by page or service:
+
+```yaml
+admin:
+    user:
+        send_password_link: 'Send a password link'
+```
+
+used as `{{ 'admin.user.send_password_link'|trans }}` in the templates and `new Text('admin.user.…')` in the
+code. To change a text, change it in each file; to add one, add its key to the four files.
+`make translations` checks that no key is missing or unused and that every language has the same keys and
+placeholders (it also runs with `make test`).
+
 ### For administrators
 
 Who administers what:
@@ -504,6 +528,7 @@ domains created, for the users they administer.
   that a mistake cannot make tokens last for years.
 - **Two-factor authentication**: optional, grace period with the date from which it becomes required, or
   required.
+- **Language**: the default language of the pages and e-mails, for whoever has chosen none.
 
 They apply at once. Until they are changed there, the values of `.env.docker` apply.
 

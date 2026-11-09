@@ -27,11 +27,11 @@ final readonly class UserChecker implements UserCheckerInterface
         }
 
         if (!$user->isEnabled()) {
-            throw new CustomUserMessageAccountStatusException('This account is disabled.');
+            throw new CustomUserMessageAccountStatusException('account.disabled');
         }
 
         if ($user->isLocked($this->clock->now())) {
-            throw new CustomUserMessageAccountStatusException('This account is temporarily locked. Try again later.');
+            throw new CustomUserMessageAccountStatusException('account.locked');
         }
     }
 

@@ -12,8 +12,8 @@ After changing `.env.docker`, apply it with `docker compose up -d` (the containe
 
 Some of them are **defaults** that the super-administrator can change in the administration pages
 (**Settings**, `/admin/settings`): `DPOP_REQUIRED_BY_DEFAULT`, `PKCE_FOR_CONFIDENTIAL_CLIENTS`,
-`APP_2FA_MODE`, `APP_2FA_DEADLINE`, `OAUTH_ACCESS_TOKEN_TTL`, `OAUTH_REFRESH_TOKEN_TTL`, `IMPERSONATION_TTL`
-and `IMPERSONATION_ACCESS_TOKEN_TTL`. A value saved there takes precedence over the variable, at once and
+`APP_2FA_MODE`, `APP_2FA_DEADLINE`, `OAUTH_ACCESS_TOKEN_TTL`, `OAUTH_REFRESH_TOKEN_TTL`, `IMPERSONATION_TTL`,
+`IMPERSONATION_ACCESS_TOKEN_TTL` and `APP_DEFAULT_LOCALE`. A value saved there takes precedence over the variable, at once and
 without restarting; **Use the defaults of the server configuration** on that page goes back to the variables.
 
 | Variable | Default | Meaning |
@@ -23,6 +23,7 @@ without restarting; **Use the defaults of the server configuration** on that pag
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | Comma-separated origins of the browser applications allowed to call `/token` and `/impersonation/end` (scheme, host and port, no path). |
 | `APP_2FA_MODE` | `grace` | `optional`, `grace` or `required`, see [Migrating existing users](migrating-users.md). Administrators always need 2FA. |
 | `APP_2FA_DEADLINE` | empty | In `grace` mode, the date from which 2FA becomes required, e.g. `2026-12-31`. Empty: not decided yet. |
+| `APP_DEFAULT_LOCALE` | `en` | Language of the pages and e-mails (`en`, `fr`, `de`, `es`) when neither the user (My profile) nor his browser gives one. |
 | `TOTP_ISSUER` | `Auth Server` | Name shown in the authenticator apps. |
 | `DPOP_REQUIRED_BY_DEFAULT` | `1` | Clients must send DPoP proofs. Per-client override: **Settings** page or `make client-policy`. |
 | `PKCE_FOR_CONFIDENTIAL_CLIENTS` | `1` | Confidential clients (with a secret) must use PKCE too. Public clients (browser, mobile) always must. |

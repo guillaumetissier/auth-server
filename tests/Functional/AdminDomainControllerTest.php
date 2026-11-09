@@ -44,7 +44,7 @@ final class AdminDomainControllerTest extends AdminTestCase
     {
         $this->signIn('manager');
         $this->browser->request('GET', '/admin/domains/a100');
-        self::assertSelectorTextContains('section.danger', 'The domain has 1 user(s)');
+        self::assertSelectorTextContains('section.danger', 'The domain has 1 user:');
         self::assertSelectorNotExists('form[action="/admin/domains/a100/delete"]');
 
         // Creates an empty subdomain, with a grant on it, then deletes it.
@@ -71,7 +71,7 @@ final class AdminDomainControllerTest extends AdminTestCase
     {
         $this->signIn('root');
         $this->browser->request('GET', '/admin/domains/a10');
-        self::assertSelectorTextContains('section.danger', 'The domain has 1 subdomain(s)');
+        self::assertSelectorTextContains('section.danger', 'The domain has 1 subdomain:');
 
         $this->browser->request('POST', '/admin/domains/a10/delete', [
             'confirm' => 'a10',

@@ -10,6 +10,8 @@ use App\Account\AccountManager;
 use App\Account\PasswordRules;
 use App\Entity\User;
 use App\Event\AccountEvent;
+use App\I18n\Locales;
+use App\I18n\Text;
 use App\OAuth\AuthorizationRequestListener;
 use App\TwoFactor\TotpEnrollment;
 use App\TwoFactor\TwoFactorPolicy;
@@ -62,6 +64,26 @@ final class AccountController extends AbstractController
     }
 
     /**
+     * The user's language: of the interface (from his next sign-in on, and at once here) and of his e-mails.
+     * Empty: the browser's.
+     */
+    #[Route('/language', name: 'app_account_language', methods: ['POST'])]
+    #[IsCsrfTokenValid('account_language', tokenKey: '_csrf_token')]
+    public function language(Request $request): Response
+    {
+        $user = $this->user();
+        $locale = $request->request->getString('locale');
+        $user->setLocale(Locales::isEnabled($locale) ? $locale : null);
+        $this->em->flush();
+
+        $session = $request->getSession();
+        null === $user->getLocale() ? $session->remove(Locales::SESSION_KEY) : $session->set(Locales::SESSION_KEY, $user->getLocale());
+        $this->addFlash('success', new Text('account.language_saved'));
+
+        return $this->redirectToRoute('app_account');
+    }
+
+    /**
      * Changing the e-mail address requires the current password: it is where password links go.
      */
     #[Route('/email', name: 'app_account_email', methods: ['POST'])]
@@ -73,12 +95,12 @@ final class AccountController extends AbstractController
         $email = '' === $email ? null : mb_strtolower($email);
 
         if (!$this->hasher->isPasswordValid($user, $request->request->getString('current_password'))) {
-            $this->addFlash('error', 'Your current password is not correct.');
+            $this->addFlash('error', new Text('account.current_password_is_not_correct'));
         } elseif (null !== ($problem = $this->accounts->identityProblem($user->getUsername(), $email, $user))) {
             $this->addFlash('error', $problem);
         } else {
             $this->accounts->updateIdentity($user, $user->getUsername(), $email, $user);
-            $this->addFlash('success', null === $email ? 'E-mail address removed.' : 'E-mail address saved.');
+            $this->addFlash('success', null === $email ? new Text('account.e_mail_address_removed') : new Text('account.e_mail_address_saved'));
         }
 
         return $this->redirectToRoute('app_account');
@@ -95,14 +117,14 @@ final class AccountController extends AbstractController
         $password = $request->request->getString('password');
 
         if (!$this->hasher->isPasswordValid($user, $request->request->getString('current_password'))) {
-            $this->addFlash('error', 'Your current password is not correct.');
+            $this->addFlash('error', new Text('account.current_password_is_not_correct'));
         } elseif (null !== ($problem = PasswordRules::problem($password, $request->request->getString('confirmation')))) {
             $this->addFlash('error', $problem);
         } else {
             $this->accounts->changePassword($user, $password, $user);
             // Keep this session: the stored hash changed, so refresh the authenticated user.
             $this->container->get('security.token_storage')->getToken()?->setUser($user);
-            $this->addFlash('success', 'Password changed. Sign in again in your applications.');
+            $this->addFlash('success', new Text('account.password_changed_sign_in_again'));
         }
 
         return $this->redirectToRoute('app_account');
@@ -128,14 +150,14 @@ final class AccountController extends AbstractController
         $error = null;
         if ($request->isMethod('POST')) {
             if (!$this->isCsrfTokenValid('totp_setup', $request->request->getString('_csrf_token'))) {
-                $error = 'Your session expired, please try again.';
+                $error = new Text('common.session_expired_please_try_again');
             } elseif ($this->enrollment->isValidCode($secret, $request->request->getString('code'))) {
                 $session->remove(self::SESSION_PENDING_SECRET);
                 $session->set(self::SESSION_BACKUP_CODES, $this->enrollment->enable($user, $secret));
 
                 return $this->redirectToRoute('app_2fa_backup_codes', array_filter(['return_to' => $returnTo]));
             } else {
-                $error = 'This code is not valid. Check the time on your phone and try again.';
+                $error = new Text('account.code_is_not_valid_check');
             }
         }
 
@@ -163,7 +185,7 @@ final class AccountController extends AbstractController
         $returnTo = self::safeReturnTo($request->query->getString('return_to')) ?? $this->generateUrl('app_account');
 
         if (!$this->twoFactorPolicy->canPostpone($user)) {
-            $this->addFlash('error', 'Two-factor authentication is now required for your account.');
+            $this->addFlash('error', new Text('account.two_factor_authentication_is_now'));
 
             return $this->redirectToRoute('app_2fa_setup', ['return_to' => $returnTo]);
         }
@@ -215,10 +237,10 @@ final class AccountController extends AbstractController
     {
         $user = $this->user();
         if (!$this->twoFactorPolicy->canDisable($user)) {
-            $this->addFlash('error', 'Two-factor authentication is mandatory and cannot be disabled.');
+            $this->addFlash('error', new Text('account.two_factor_authentication_is_mandatory'));
         } elseif ($this->checkCurrentCode($user, $request)) {
             $this->enrollment->disable($user);
-            $this->addFlash('success', 'Two-factor authentication disabled.');
+            $this->addFlash('success', new Text('account.two_factor_authentication_disabled'));
         }
 
         return $this->redirectToRoute('app_account');
@@ -231,7 +253,7 @@ final class AccountController extends AbstractController
     {
         $secret = $user->getTotpAuthenticationConfiguration()?->getSecret();
         if (null === $secret || !$this->enrollment->isValidCode($secret, $request->request->getString('code'))) {
-            $this->addFlash('error', 'Invalid authentication code.');
+            $this->addFlash('error', new Text('account.invalid_authentication_code'));
 
             return false;
         }

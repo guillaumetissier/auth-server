@@ -1,74 +1,80 @@
 {% extends '_app.html.twig' %}
 
-{% block title %}Dashboard{% endblock %}
+{% block title %}{{ 'common.dashboard'|trans }}{% endblock %}
 
 {% block content %}
-    <h1>Hello {{ app.user.username }}</h1>
+    <h1>{{ 'dashboard.hello_username'|trans({'{username}': app.user.username}) }}</h1>
     <p class="sub">{{ app_name }}</p>
 
     {% for n in notifications %}
         <div class="notice {{ n.level }}" role="status">
-            <span>{{ n.text }}</span>
-            {% if n.link is defined %}<a class="button small" href="{{ n.link }}">{{ n.action }}</a>{% endif %}
+            <span>{{ n.text|trans }}</span>
+            {% if n.link is defined %}<a class="button small" href="{{ n.link }}">{{ n.action|trans }}</a>{% endif %}
         </div>
     {% else %}
-        <div class="notice info" role="status"><span>Everything is in order: two-factor authentication is on and your e-mail address is set.</span></div>
+        <div class="notice info" role="status"><span>{{ 'dashboard.everything_is_in_order_two'|trans }}</span></div>
     {% endfor %}
 
     {% if admin %}
         {% set s = admin.stats %}
-        <h2>Accounts <span class="muted" style="font-weight: 400; font-size: .85rem">— {{ admin.scope }}</span></h2>
+        <h2>{{ 'dashboard.accounts'|trans }} <span class="muted" style="font-weight: 400; font-size: .85rem">— {{ admin.scope|trans }}</span></h2>
         <div class="cards">
-            <div class="card"><div class="value">{{ s.total }}</div><div class="label">users</div></div>
+            <div class="card"><div class="value">{{ s.total }}</div><div class="label">{{ 'dashboard.users'|trans }}</div></div>
             <div class="card">
                 <div class="value">{{ s.total > 0 ? (s.two_factor * 100 / s.total)|round : 0 }} %</div>
-                <div class="label">with two-factor ({{ s.two_factor }} / {{ s.total }})</div>
+                <div class="label">{{ 'dashboard.with_two_factor_count_total'|trans({'{count}': s.two_factor, '{total}': s.total}) }}</div>
                 <div class="meter" aria-hidden="true"><span style="width: {{ s.total > 0 ? (s.two_factor * 100 / s.total)|round : 0 }}%"></span></div>
             </div>
-            <div class="card"><div class="value">{{ s.locked }}</div><div class="label">locked right now</div></div>
-            <div class="card"><div class="value">{{ s.disabled }}</div><div class="label">disabled</div></div>
-            <div class="card"><div class="value">{{ s.without_email }}</div><div class="label">without e-mail address</div></div>
-            <div class="card"><div class="value">{{ admin.domain_count }}</div><div class="label">domains</div></div>
+            <div class="card"><div class="value">{{ s.locked }}</div><div class="label">{{ 'dashboard.locked_right_now'|trans }}</div></div>
+            <div class="card"><div class="value">{{ s.disabled }}</div><div class="label">{{ 'common.disabled'|trans }}</div></div>
+            <div class="card"><div class="value">{{ s.without_email }}</div><div class="label">{{ 'dashboard.without_e_mail_address'|trans }}</div></div>
+            <div class="card"><div class="value">{{ admin.domain_count }}</div><div class="label">{{ 'dashboard.domains'|trans }}</div></div>
         </div>
-        <p class="help">Two-factor policy: <strong>{{ admin.two_factor_mode }}</strong>{% if admin.two_factor_deadline %}, required from {{ admin.two_factor_deadline|date('Y-m-d') }}{% endif %}.</p>
+        <p class="help">
+            {%- if admin.two_factor_deadline -%}
+                {{ 'dashboard.two_factor_policy_mode_required'|trans({'{mode}': ('two_factor.mode.' ~ admin.two_factor_mode)|trans|e, '{date}': admin.two_factor_deadline|locale_date})|raw }}
+            {%- else -%}
+                {{ 'dashboard.two_factor_policy_mode'|trans({'{mode}': ('two_factor.mode.' ~ admin.two_factor_mode)|trans|e})|raw }}
+            {%- endif -%}
+        </p>
 
         <div class="columns">
             <section>
-                <h2>Last sign-ins</h2>
+                <h2>{{ 'dashboard.last_sign_ins'|trans }}</h2>
                 <table>
-                    <thead><tr><th>User</th><th>Domain</th><th>When</th></tr></thead>
+                    <thead><tr><th>{{ 'common.user'|trans }}</th><th>{{ 'common.domain'|trans }}</th><th>{{ 'dashboard.when'|trans }}</th></tr></thead>
                     <tbody>
                     {% for u in admin.recent_logins %}
                         <tr>
                             <td><a href="{{ path('app_admin_user', {id: u.id}) }}">{{ u.username }}</a></td>
                             <td class="expr">{{ u.domain ? u.domain.path : '—' }}</td>
-                            <td>{{ u.lastLoginAt|date('Y-m-d H:i') }}</td>
+                            <td>{{ u.lastLoginAt|locale_date('datetime') }}</td>
                         </tr>
                     {% else %}
-                        <tr><td colspan="3" class="muted">Nobody yet.</td></tr>
+                        <tr><td colspan="3" class="muted">{{ 'dashboard.nobody_yet'|trans }}</td></tr>
                     {% endfor %}
                     </tbody>
                 </table>
-                <p class="help"><a href="{{ path('app_admin_users') }}">All users</a></p>
+                <p class="help"><a href="{{ path('app_admin_users') }}">{{ 'dashboard.all_users'|trans }}</a></p>
             </section>
             <section>
-                <h2>Last domains created</h2>
+                <h2>{{ 'dashboard.last_domains_created'|trans }}</h2>
                 <table>
-                    <thead><tr><th>Domain</th><th>Name</th><th class="num">Users</th><th>Created</th></tr></thead>
+                    <thead><tr><th>{{ 'common.domain'|trans }}</th><th>{{ 'common.name'|trans }}</th><th class="num">{{ 'common.users'|trans }}</th><th>{{ 'common.created'|trans }}</th></tr></thead>
                     <tbody>
                     {% for d in admin.recent_domains %}
                         <tr>
                             <td><a href="{{ path('app_admin_domain', {code: d.code}) }}" class="expr">{{ d.path }}</a></td>
                             <td>{{ d.name }}</td>
                             <td class="num">{{ admin.members[d.id] ?? 0 }}</td>
-                            <td>{{ d.createdAt|date('Y-m-d') }}</td>
+                            <td>{{ d.createdAt|locale_date }}</td>
                         </tr>
                     {% else %}
-                        <tr><td colspan="4" class="muted">No domain.</td></tr>
+                        <tr><td colspan="4" class="muted">{{ 'dashboard.no_domain'|trans }}</td></tr>
                     {% endfor %}
                     </tbody>
                 </table>
-                <p class="help"><a href="{{ path('app_admin_domains') }}">All domains</a></p>
+                <p class="help"><a href="{{ path('app_admin_domains') }}">{{ 'dashboard.all_domains'|trans }}</a></p>
             </section>
         </div>
     {% endif %}

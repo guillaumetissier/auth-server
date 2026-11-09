@@ -113,7 +113,7 @@ final readonly class AccessCommand
                     $error = \sprintf('%s belongs to %s: rights can only be granted on it or its subdomains.', $username, $userDomain->getPath());
                 }
                 if (null !== $error) {
-                    $io->error($error);
+                    $io->error((string) $error);
 
                     return Command::FAILURE;
                 }

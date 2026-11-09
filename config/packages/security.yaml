@@ -60,6 +60,7 @@ security:
         - { path: ^/login$, roles: PUBLIC_ACCESS }
         - { path: ^/logout$, roles: PUBLIC_ACCESS }
         - { path: ^/password/, roles: PUBLIC_ACCESS }                     # forgotten password, password links
+        - { path: ^/language/, roles: PUBLIC_ACCESS }                     # language links
         - { path: ^/2fa, roles: IS_AUTHENTICATED_2FA_IN_PROGRESS }
         - { path: ^/authorize, roles: IS_AUTHENTICATED_FULLY }
         - { path: ^/account, roles: IS_AUTHENTICATED_FULLY }

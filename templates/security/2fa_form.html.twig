@@ -1,21 +1,21 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Two-factor authentication{% endblock %}
+{% block title %}{{ 'common.two_factor_authentication'|trans }}{% endblock %}
 
 {% block body %}
-    <h1>Two-factor authentication</h1>
-    <p class="sub">Enter the 6-digit code from your authenticator app, or one of your backup codes.</p>
+    <h1>{{ 'common.two_factor_authentication'|trans }}</h1>
+    <p class="sub">{{ 'security.two_factor_form.enter_6_digit_code_from'|trans }}</p>
 
     {% if authenticationError %}
         <div class="alert error" role="alert">
-            {% if authenticationError == 'code_invalid' %}This code is not valid.
-            {% elseif authenticationError == 'code_reused' %}This code has already been used, wait for the next one.
-            {% else %}Authentication failed, please try again.{% endif %}
+            {% if authenticationError == 'code_invalid' %}{{ 'security.two_factor_form.code_is_not_valid'|trans }}
+            {% elseif authenticationError == 'code_reused' %}{{ 'security.two_factor_form.code_has_already_been_used'|trans }}
+            {% else %}{{ 'security.two_factor_form.authentication_failed_please_try_again'|trans }}{% endif %}
         </div>
     {% endif %}
 
     <form method="post" action="{{ checkPathUrl ? checkPathUrl : path(checkPathRoute) }}">
-        <label for="_auth_code">Authentication code</label>
+        <label for="_auth_code">{{ 'security.two_factor_form.authentication_code'|trans }}</label>
         <input type="text" id="_auth_code" name="{{ authCodeParameterName }}" class="code"
                autocomplete="one-time-code" autofocus required maxlength="11">
 
@@ -23,8 +23,8 @@
             <input type="hidden" name="{{ csrfParameterName }}" value="{{ csrf_token(csrfTokenId) }}">
         {% endif %}
 
-        <button type="submit">Verify</button>
+        <button type="submit">{{ 'security.two_factor_form.verify'|trans }}</button>
     </form>
 
-    <p class="links"><a href="{{ logoutPath }}">Cancel and sign out</a></p>
+    <p class="links"><a href="{{ logoutPath }}">{{ 'security.two_factor_form.cancel_and_sign_out'|trans }}</a></p>
 {% endblock %}

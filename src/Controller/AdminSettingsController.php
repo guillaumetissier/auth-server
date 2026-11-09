@@ -6,6 +6,8 @@ namespace App\Controller;
 
 use App\Entity\ClientPolicy;
 use App\Entity\User;
+use App\I18n\Locales;
+use App\I18n\Text;
 use App\Settings\Duration;
 use App\Settings\SystemSettings;
 use Doctrine\ORM\EntityManagerInterface;
@@ -23,13 +25,20 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/admin/settings')]
 final class AdminSettingsController extends AbstractAdminController
 {
-    /** What each lifetime is, for the page. */
-    private const LIFETIMES = [
-        SystemSettings::ACCESS_TOKEN_TTL => ['Access token', 'Sent with every request to an API. Short: a stolen token stops working soon. The applications renew it with the refresh token, without asking the user.'],
-        SystemSettings::REFRESH_TOKEN_TTL => ['Refresh token', 'How long a user stays signed in to an application without typing his password again (each renewal gives a new one, valid this long).'],
-        SystemSettings::IMPERSONATION_TTL => ['Impersonation session', 'How long an administrator may act on behalf of a user before signing in again.'],
-        SystemSettings::IMPERSONATION_ACCESS_TOKEN_TTL => ['Access token during an impersonation', 'Kept short, so that ending an impersonation takes effect quickly in the APIs.'],
-    ];
+    /**
+     * What each lifetime is, for the page: label and help.
+     *
+     * @return array<string, array{Text, Text}>
+     */
+    private static function lifetimes(): array
+    {
+        return [
+            SystemSettings::ACCESS_TOKEN_TTL => [new Text('admin.settings.access_token'), new Text('admin.settings.sent_with_every_request_to')],
+            SystemSettings::REFRESH_TOKEN_TTL => [new Text('admin.settings.refresh_token'), new Text('admin.settings.how_long_user_stays_signed')],
+            SystemSettings::IMPERSONATION_TTL => [new Text('admin.settings.impersonation_session'), new Text('admin.settings.how_long_administrator_may_act')],
+            SystemSettings::IMPERSONATION_ACCESS_TOKEN_TTL => [new Text('admin.settings.access_token_during_impersonation'), new Text('admin.settings.kept_short_so_that_ending')],
+        ];
+    }
 
     public function __construct(
         private readonly SystemSettings $settings,
@@ -52,7 +61,7 @@ final class AdminSettingsController extends AbstractAdminController
             $rows[$name] = $this->settings->row($name);
         }
         $lifetimes = [];
-        foreach (self::LIFETIMES as $name => [$label, $help]) {
+        foreach (self::lifetimes() as $name => [$label, $help]) {
             [$amount, $unit] = Duration::split($this->settings->lifetimeIso($name));
             [$min, $max] = SystemSettings::LIFETIME_BOUNDS[$name];
             $lifetimes[$name] = [
@@ -61,8 +70,8 @@ final class AdminSettingsController extends AbstractAdminController
                 'help' => $help,
                 'amount' => $amount,
                 'unit' => $unit,
-                'default' => Duration::human($this->settings->defaults()[$name]),
-                'range' => \sprintf('from %s to %s', Duration::human('PT'.intdiv($min, 60).'M'), Duration::human('PT'.intdiv($max, 60).'M')),
+                'default' => Duration::text($this->settings->defaults()[$name]),
+                'range' => new Text('admin.settings.from_min_to_max', ['{min}' => Duration::text('PT'.intdiv($min, 60).'M'), '{max}' => Duration::text('PT'.intdiv($max, 60).'M')]),
             ];
         }
 
@@ -77,6 +86,7 @@ final class AdminSettingsController extends AbstractAdminController
             'pkce_confidential' => $this->settings->pkceForConfidentialClients(),
             'two_factor_mode' => $this->settings->twoFactorMode(),
             'two_factor_deadline' => $this->settings->twoFactorDeadline(),
+            'default_locale' => $this->settings->defaultLocale(),
             'rows' => $rows,
             'defaults' => $this->settings->defaults(),
             'lifetimes' => $lifetimes,
@@ -93,7 +103,7 @@ final class AdminSettingsController extends AbstractAdminController
 
         if ($request->request->getBoolean('use_defaults')) {
             $this->settings->save(array_fill_keys(array_keys($this->settings->defaults()), null), $actor);
-            $this->addFlash('success', 'Back to the defaults of the server configuration (.env.docker).');
+            $this->addFlash('success', new Text('admin.settings.back_to_defaults_server_configuration'));
 
             return $this->redirectToRoute('app_admin_settings');
         }
@@ -101,21 +111,23 @@ final class AdminSettingsController extends AbstractAdminController
         $mode = $request->request->getString('two_factor_mode');
         $deadline = trim($request->request->getString('two_factor_deadline'));
         $date = '' === $deadline ? null : \DateTimeImmutable::createFromFormat('!Y-m-d', $deadline);
+        $locale = $request->request->getString('default_locale', $this->settings->defaultLocale());
         $error = match (true) {
-            !\in_array($mode, SystemSettings::TWO_FACTOR_MODES, true) => 'Choose a two-factor mode.',
-            false === $date || (null !== $date && $date->format('Y-m-d') !== $deadline) => 'The deadline must be a date such as 2026-12-31.',
+            !\in_array($mode, SystemSettings::TWO_FACTOR_MODES, true) => new Text('admin.settings.choose_two_factor_mode'),
+            false === $date || (null !== $date && $date->format('Y-m-d') !== $deadline) => new Text('admin.settings.deadline_must_be_date_such'),
+            !Locales::isEnabled($locale) => new Text('admin.settings.choose_language'),
             default => null,
         };
         $lifetimes = [];
-        foreach (array_keys(self::LIFETIMES) as $name) {
+        foreach (array_keys(self::lifetimes()) as $name) {
             [$lifetimes[$name], $problem] = $this->lifetime($request, $name);
             $error ??= $problem;
         }
         if (null === $error) {
             $seconds = array_map(static fn (string $iso): int => Duration::seconds($iso), $lifetimes);
             $error = match (true) {
-                $seconds[SystemSettings::REFRESH_TOKEN_TTL] <= $seconds[SystemSettings::ACCESS_TOKEN_TTL] => 'The refresh token must live longer than the access token.',
-                $seconds[SystemSettings::IMPERSONATION_ACCESS_TOKEN_TTL] > $seconds[SystemSettings::IMPERSONATION_TTL] => 'During an impersonation, the access token cannot live longer than the session.',
+                $seconds[SystemSettings::REFRESH_TOKEN_TTL] <= $seconds[SystemSettings::ACCESS_TOKEN_TTL] => new Text('admin.settings.refresh_token_must_live_longer'),
+                $seconds[SystemSettings::IMPERSONATION_ACCESS_TOKEN_TTL] > $seconds[SystemSettings::IMPERSONATION_TTL] => new Text('admin.settings.during_impersonation_access_token_cannot'),
                 default => null,
             };
         }
@@ -130,9 +142,10 @@ final class AdminSettingsController extends AbstractAdminController
             SystemSettings::PKCE_CONFIDENTIAL => $request->request->getBoolean('pkce_confidential') ? '1' : '0',
             SystemSettings::TWO_FACTOR_MODE => $mode,
             SystemSettings::TWO_FACTOR_DEADLINE => $deadline,
+            SystemSettings::DEFAULT_LOCALE => $locale,
         ], $actor);
 
-        $this->addFlash('success', 'Settings saved. They apply at once, to the next sign-ins and token requests.');
+        $this->addFlash('success', new Text('admin.settings.settings_saved_they_apply_at'));
 
         return $this->redirectToRoute('app_admin_settings');
     }
@@ -168,7 +181,7 @@ final class AdminSettingsController extends AbstractAdminController
             'actor' => $actor->getUsername(),
             'actor_id' => $actor->getExternalUserId(),
         ]);
-        $this->addFlash('success', \sprintf('DPoP policy of %s saved.', $client->getName()));
+        $this->addFlash('success', new Text('admin.settings.dpop_policy_name_saved', ['{name}' => $client->getName()]));
 
         return $this->redirectToRoute('app_admin_settings');
     }
@@ -176,7 +189,7 @@ final class AdminSettingsController extends AbstractAdminController
     /**
      * The lifetime typed in the form, as an ISO 8601 duration, and why it is refused (null: accepted).
      *
-     * @return array{string, string|null}
+     * @return array{string, Text|null}
      */
     private function lifetime(Request $request, string $name): array
     {
@@ -184,13 +197,17 @@ final class AdminSettingsController extends AbstractAdminController
         $amount = $request->request->getString($field.'_amount');
         $unit = $request->request->getString($field.'_unit');
         if (1 !== preg_match('/^[1-9][0-9]{0,5}$/', $amount) || !\array_key_exists($unit, Duration::UNITS)) {
-            return ['', \sprintf('%s: give a whole number of minutes, hours or days.', self::LIFETIMES[$name][0])];
+            return ['', new Text('admin.settings.lifetime_give_whole_number_minutes', ['{lifetime}' => self::lifetimes()[$name][0]])];
         }
         $iso = Duration::toIso((int) $amount, $unit);
         [$min, $max] = SystemSettings::LIFETIME_BOUNDS[$name];
         $seconds = Duration::seconds($iso);
         if ($seconds < $min || $seconds > $max) {
-            return [$iso, \sprintf('%s: between %s and %s.', self::LIFETIMES[$name][0], Duration::human('PT'.intdiv($min, 60).'M'), Duration::human('PT'.intdiv($max, 60).'M'))];
+            return [$iso, new Text('admin.settings.lifetime_between_min_and_max', [
+                '{lifetime}' => self::lifetimes()[$name][0],
+                '{min}' => Duration::text('PT'.intdiv($min, 60).'M'),
+                '{max}' => Duration::text('PT'.intdiv($max, 60).'M'),
+            ])];
         }
 
         return [$iso, null];

@@ -76,6 +76,9 @@ purge: ## Remove expired tokens and DPoP replay entries (schedule it, e.g. hourl
 test: ## Run the server test suite locally (needs PHP 8.3+ and composer)
 	composer install -q && vendor/bin/phpunit
 
+translations: ## Check the translations (translations/*.yaml): no key missing or unused, same keys in every language
+	composer install -q && vendor/bin/phpunit tests/TranslationsTest.php
+
 cs: ## Check the coding standard (PHP-CS-Fixer), change nothing
 	composer cs
 

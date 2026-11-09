@@ -8,6 +8,7 @@ use App\Access\AccessManager;
 use App\Entity\AccessGrant;
 use App\Entity\Domain;
 use App\Entity\User;
+use App\I18n\Text;
 use Doctrine\ORM\EntityManagerInterface;
 use GuillaumeTissier\ResourceGuard\Access\AccessExpression;
 use GuillaumeTissier\ResourceGuard\Access\AccessLevel;
@@ -57,16 +58,16 @@ final class AdminDomainController extends AbstractAdminController
 
         $code = strtolower(trim($request->request->getString('code')));
         if (null !== $this->domains->findByCode($code)) {
-            $this->addFlash('error', \sprintf('Domain "%s" already exists.', $code));
+            $this->addFlash('error', new Text('admin.domain.domain_code_already_exists', ['{code}' => $code]));
         } else {
             try {
                 $domain = $this->manager->createDomain($code, trim($request->request->getString('name')) ?: $code, $parent);
                 $this->audit('domain.created', $domain, $actor);
-                $this->addFlash('success', \sprintf('Domain %s created.', $domain->getPath()));
+                $this->addFlash('success', new Text('admin.domain.domain_domain_created', ['{domain}' => $domain->getPath()]));
 
                 return $this->redirectToRoute('app_admin_domain', ['code' => $domain->getCode()]);
             } catch (\InvalidArgumentException $e) {
-                $this->addFlash('error', $e->getMessage());
+                $this->addFlash('error', Text::of($e));
             }
         }
 
@@ -112,14 +113,14 @@ final class AdminDomainController extends AbstractAdminController
         $domain = $this->findDomain($code);
         $name = trim($request->request->getString('name'));
 
-        $denial = $this->policy->domainRenameDenial($actor, $domain) ?? ('' === $name || mb_strlen($name) > 255 ? 'Give a name of 1 to 255 characters.' : null);
+        $denial = $this->policy->domainRenameDenial($actor, $domain) ?? ('' === $name || mb_strlen($name) > 255 ? new Text('admin.domain.give_name_1_to_255') : null);
         if (null !== $denial) {
             $this->addFlash('error', $denial);
         } else {
             $domain->setName($name);
             $this->em->flush();
             $this->audit('domain.renamed', $domain, $actor);
-            $this->addFlash('success', 'Domain renamed.');
+            $this->addFlash('success', new Text('admin.domain.domain_renamed'));
         }
 
         return $this->redirectToRoute('app_admin_domain', ['code' => $code]);
@@ -137,7 +138,7 @@ final class AdminDomainController extends AbstractAdminController
 
         $denial = $this->policy->domainDeleteDenial($actor, $domain, \count($this->users->membersOf($domain, 1)), $this->domains->countChildren($domain));
         if (null === $denial && $request->request->getString('confirm') !== $domain->getCode()) {
-            $denial = \sprintf('Type the code of the domain (%s) to confirm.', $domain->getCode());
+            $denial = new Text('admin.domain.confirm_code_error', ['{code}' => $domain->getCode()]);
         }
         if (null !== $denial) {
             $this->addFlash('error', $denial);
@@ -150,7 +151,7 @@ final class AdminDomainController extends AbstractAdminController
         $this->em->createQuery('DELETE FROM '.AccessGrant::class.' g WHERE g.domain = :d')->setParameter('d', $domain)->execute();
         $this->em->remove($domain);
         $this->em->flush();
-        $this->addFlash('success', \sprintf('Domain %s deleted.', $domain->getPath()));
+        $this->addFlash('success', new Text('admin.domain.domain_domain_deleted', ['{domain}' => $domain->getPath()]));
 
         return null === $parent ? $this->redirectToRoute('app_admin_domains') : $this->redirectToRoute('app_admin_domain', ['code' => $parent->getCode()]);
     }
@@ -165,14 +166,14 @@ final class AdminDomainController extends AbstractAdminController
         $username = trim($request->request->getString('owner'));
         $owner = '' === $username ? null : $this->users->findOneByUsername($username);
         if ('' !== $username && null === $owner) {
-            $this->addFlash('error', \sprintf('Unknown user "%s".', $username));
+            $this->addFlash('error', new Text('admin.domain.unknown_user_username', ['{username}' => $username]));
 
             return $this->redirectToRoute('app_admin_domain', ['code' => $code]);
         }
         try {
             $expression = AccessExpression::parse($request->request->getString('owner_rights'));
         } catch (InvalidAccessExpression $e) {
-            $this->addFlash('error', $e->getMessage());
+            $this->addFlash('error', Text::of($e));
 
             return $this->redirectToRoute('app_admin_domain', ['code' => $code]);
         }
@@ -182,7 +183,7 @@ final class AdminDomainController extends AbstractAdminController
             $this->addFlash('error', $denial);
         } else {
             $this->manager->setOwner($domain, $owner, $expression, $actor);
-            $this->addFlash('success', 'Owner saved. It applies from the next token of the users concerned.');
+            $this->addFlash('success', new Text('admin.domain.owner_saved_it_applies_from'));
         }
 
         return $this->redirectToRoute('app_admin_domain', ['code' => $code]);
@@ -196,7 +197,7 @@ final class AdminDomainController extends AbstractAdminController
         $domain = $this->findDomain($code);
         $target = $this->users->findOneByUsername(trim($request->request->getString('username')));
         if (null === $target) {
-            $this->addFlash('error', 'Unknown user.');
+            $this->addFlash('error', new Text('admin.domain.unknown_user'));
 
             return $this->redirectToRoute('app_admin_domain', ['code' => $code]);
         }
@@ -204,13 +205,17 @@ final class AdminDomainController extends AbstractAdminController
         $denial = $this->policy->domainChangeDenial($actor, $target, $domain);
         if (null === $denial && null !== $target->getDomain() && !$this->policy->isSuperAdmin($actor)
             && !$this->policy->levelOn($actor, '@access', $target->getDomain())->includes(AccessLevel::Write)) {
-            $denial = 'This user belongs to a domain you do not manage.';
+            $denial = new Text('admin.domain.user_belongs_to_domain_you');
         }
         if (null !== $denial) {
             $this->addFlash('error', $denial);
         } else {
             $removed = $this->manager->moveUser($target, $domain, $actor);
-            $this->addFlash('success', \sprintf('%s now belongs to %s.%s', $target->getUsername(), $domain->getPath(), $removed > 0 ? \sprintf(' %d grant(s) outside it removed.', $removed) : ''));
+            $this->addFlash('success', new Text('admin.domain.username_now_belongs_to_domain', [
+                '{username}' => $target->getUsername(),
+                '{domain}' => $domain->getPath(),
+                '{removed}' => $removed,
+            ]));
         }
 
         return $this->redirectToRoute('app_admin_domain', ['code' => $code]);

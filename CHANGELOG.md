@@ -6,6 +6,24 @@ one version number covers the server and its browser client (`packages/oauth-dpo
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-09
+
+### Added
+- The pages and the e-mails in French, German and Spanish, besides English: sign-in, two-factor
+  authentication, impersonation, password links, dashboard, My profile and the administration pages,
+  with their messages, confirmation dialogs and tooltips. Dates follow the language.
+- Language links at the bottom of every page (for the session); a **Language** choice in My profile, kept
+  on the account (`users.locale`, migration) and applied from the next sign-in; otherwise the browser's
+  language, otherwise the default language of **Settings** (`APP_DEFAULT_LOCALE`, `en` by default).
+- E-mails (password links, invitations) go out in the language of their recipient.
+- `translations/messages+intl-icu.{en,fr,de,es}.yaml`: texts by key, grouped by page (`admin.user.…`,
+  `account.…`), in ICU format with plurals ("1 grant", "2 grants"); `make translations` checks that no key is
+  missing or unused and that every language has the same keys and placeholders.
+
+### Changed
+- Messages saying "grant(s)", "user(s)"… now use the right singular or plural.
+- OAuth error codes and descriptions, the command line, the audit log and the demo stay in English.
+
 ## [0.6.0] - 2026-11-08
 
 ### Added
@@ -145,7 +163,8 @@ First public version.
 - Quality checks in CI: PHPUnit functional tests, PHPStan at level max, PHP-CS-Fixer, and an end-to-end
   check over real HTTP (`tools/e2e.php`) against the Docker image and MySQL.
 
-[Unreleased]: https://github.com/guillaumetissier/auth-server/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/guillaumetissier/auth-server/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/guillaumetissier/auth-server/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/guillaumetissier/auth-server/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/guillaumetissier/auth-server/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/guillaumetissier/auth-server/compare/v0.2.0...v0.4.0

@@ -14,7 +14,7 @@
       pending = form;
       dialog.querySelector('h2').textContent = form.dataset.confirmTitle;
       dialog.querySelector('[data-confirm-text]').textContent = form.dataset.confirmText ?? '';
-      confirmButton.textContent = form.dataset.confirmButton ?? 'Remove';
+      confirmButton.textContent = form.dataset.confirmButton ?? confirmButton.dataset.defaultLabel;
       confirmButton.classList.toggle('danger', form.dataset.confirmDanger !== '0');
       dialog.showModal();
       dialog.querySelector('[data-close-dialog]').focus(); // Cancel by default: Enter does not confirm.

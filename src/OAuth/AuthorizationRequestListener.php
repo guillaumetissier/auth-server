@@ -94,7 +94,7 @@ final readonly class AuthorizationRequestListener
 
         $denial = $this->impersonationPolicy->denialReason($admin, $target);
         if (null !== $denial) {
-            throw self::deny($event, $denial);
+            throw self::deny($event, (string) $denial);
         }
 
         $sessionId = $this->confirmations->consume($requestUri);

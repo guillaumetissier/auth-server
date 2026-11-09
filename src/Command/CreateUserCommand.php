@@ -60,7 +60,7 @@ final readonly class CreateUserCommand
 
         $password ??= $io->askHidden('Password');
         if (!\is_string($password) || null !== ($problem = PasswordRules::problem($password))) {
-            $io->error($problem ?? 'A password is required.');
+            $io->error((string) ($problem ?? 'A password is required.'));
 
             return Command::FAILURE;
         }

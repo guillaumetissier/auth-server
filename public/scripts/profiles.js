@@ -22,8 +22,9 @@
     for (const name of ['code', 'name', 'rights', 'description']) {
       field(name).value = isEdit ? (data[name] ?? '') : '';
     }
-    dialog.querySelector('h2').textContent = isEdit ? `Edit the profile ${data.name}` : 'New profile';
-    submit.textContent = isEdit ? 'Save' : 'Create';
+    // Translated texts: data attributes of the dialog.
+    dialog.querySelector('h2').textContent = isEdit ? dialog.dataset.titleEdit.replaceAll('{name}', data.name) : dialog.dataset.titleCreate;
+    submit.textContent = isEdit ? dialog.dataset.labelSave : dialog.dataset.labelCreate;
     dialog.showModal();
     field('name').focus();
   }
@@ -40,7 +41,7 @@
   // Changing the rights after an impact was shown: the confirmation no longer applies.
   field('rights').addEventListener('input', () => {
     form.querySelector('input[name="confirmed"]')?.remove();
-    submit.textContent = field('code').readOnly ? 'Save' : 'Create';
+    submit.textContent = field('code').readOnly ? dialog.dataset.labelSave : dialog.dataset.labelCreate;
   });
 
   if (dialog.hasAttribute('data-open')) {

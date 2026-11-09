@@ -34,7 +34,7 @@ final class ResourceTypeCommandTest extends AdminTestCase
         $tester = $this->command('app:resource-type');
 
         self::assertSame(1, $tester->execute(['code' => 'vehicle', '--remove' => true]));
-        self::assertStringContainsString('still used in 2 place(s)', $tester->getDisplay());
+        self::assertStringContainsString('still used in 2 places', $tester->getDisplay());
     }
 
     public function testFacetOfAnUnknownTypeIsRefused(): void

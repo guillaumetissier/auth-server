@@ -91,7 +91,7 @@ final class ProfileManagerTest extends AdminTestCase
             $this->profiles->remove($fleet, null);
             self::fail('Given profile removed');
         } catch (\DomainException $e) {
-            self::assertStringContainsString('still given to 1 user(s): reader on /a1/a10/', $e->getMessage());
+            self::assertStringContainsString('still given to 1 user: reader on /a1/a10/', $e->getMessage());
         }
 
         $this->profiles->remove($unused, null);
@@ -104,7 +104,7 @@ final class ProfileManagerTest extends AdminTestCase
         $this->profiles->save('billing', 'Billing', AccessExpression::parse('invoice:w'), null, null, true);
         $this->em()->flush();
 
-        self::assertSame(['profile billing'], static::getContainer()->get(ResourceCatalog::class)->usages('invoice'));
+        self::assertSame(['profile billing'], array_map(strval(...), static::getContainer()->get(ResourceCatalog::class)->usages('invoice')));
     }
 
     private function give(string $username, string $domain, AccessProfile $profile, string $adjustments): void

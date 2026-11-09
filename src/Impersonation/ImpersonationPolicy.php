@@ -6,6 +6,7 @@ namespace App\Impersonation;
 
 use App\Access\AccessPolicy;
 use App\Entity\User;
+use App\I18n\Text;
 use App\Settings\SystemSettings;
 use GuillaumeTissier\ResourceGuard\Access\AccessLevel;
 use GuillaumeTissier\ResourceGuard\Token\Impersonation;
@@ -75,27 +76,27 @@ final readonly class ImpersonationPolicy
     }
 
     /**
-     * @return string|null why $admin may not impersonate $target, null when allowed
+     * @return Text|null why $admin may not impersonate $target, null when allowed
      */
-    public function denialReason(User $admin, User $target): ?string
+    public function denialReason(User $admin, User $target): ?Text
     {
         if (null === $this->modeFor($admin, $target)) {
-            return 'You are not allowed to impersonate this user.';
+            return new Text('impersonation.policy.you_are_not_allowed_to');
         }
         if ($admin->getId() === $target->getId()) {
-            return 'You cannot impersonate yourself.';
+            return new Text('impersonation.policy.you_cannot_impersonate_yourself');
         }
         if ($target->hasRole(User::ROLE_SUPER_ADMIN)) {
-            return 'The super-administrator cannot be impersonated.';
+            return new Text('impersonation.policy.super_administrator_cannot_be_impersonated');
         }
         if ($target->hasRole(User::ROLE_ADMIN) && !$admin->hasRole(User::ROLE_SUPER_ADMIN)) {
-            return 'Only the super-administrator can impersonate an administrator.';
+            return new Text('impersonation.policy.only_super_administrator_can_impersonate');
         }
         if (!$admin->hasRole(User::ROLE_ADMIN) && $this->access->isAboveOrOwnerOf($target, $admin)) {
-            return 'You cannot impersonate the owner of your domain.';
+            return new Text('impersonation.policy.you_cannot_impersonate_owner_domain');
         }
         if (!$target->isEnabled()) {
-            return 'This account is disabled.';
+            return new Text('impersonation.policy.account_is_disabled');
         }
 
         return null;

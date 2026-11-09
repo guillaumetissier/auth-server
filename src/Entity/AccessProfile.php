@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Entity;
 
+use App\I18n\InvalidInput;
 use Doctrine\ORM\Mapping as ORM;
 use GuillaumeTissier\ResourceGuard\Access\AccessExpression;
 
@@ -37,7 +38,7 @@ class AccessProfile
     public function __construct(string $code, string $name, AccessExpression $expression, ?string $description = null)
     {
         if (1 !== preg_match(self::CODE_PATTERN, $code)) {
-            throw new \InvalidArgumentException(\sprintf('Invalid profile code "%s" (lowercase letters, digits, "-" and "_", starting with a letter).', $code));
+            throw new InvalidInput('access.profiles.invalid_profile_code_code_lowercase', ['{code}' => $code]);
         }
         $this->code = $code;
         $this->update($name, $expression, $description);

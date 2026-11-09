@@ -51,6 +51,23 @@ final class PasswordControllerTest extends OAuthTestCase
         self::assertSelectorExists('.alert.error', 'the old password no longer works');
     }
 
+    public function testTheEmailIsInTheLanguageOfItsRecipient(): void
+    {
+        [$alice] = $this->createUser(withTotp: false);
+        $alice->setEmail('alice@example.test');
+        $alice->setLocale('es');
+        $this->em()->flush();
+
+        $this->browser->request('GET', '/password/forgot');
+        $this->browser->submitForm('Send the link', ['identifier' => 'alice']);
+        self::assertSelectorTextContains('.alert.ok', 'If an account matches', 'the page stays in the language of the visitor');
+
+        $email = self::getMailerMessage();
+        self::assertInstanceOf(Email::class, $email);
+        self::assertSame('Elegir una nueva contraseña', $email->getSubject());
+        self::assertStringContainsString('Hola, alice', (string) $email->getTextBody());
+    }
+
     public function testTheAnswerDoesNotRevealWhoHasAnAccount(): void
     {
         [$bob] = $this->createUser('bob', 'app-bob', withTotp: false); // no e-mail address

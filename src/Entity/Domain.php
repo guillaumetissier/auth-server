@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Entity;
 
+use App\I18n\InvalidInput;
 use App\Repository\DomainRepository;
 use Doctrine\ORM\Mapping as ORM;
 use GuillaumeTissier\ResourceGuard\Access\AccessExpression;
@@ -54,7 +55,7 @@ class Domain
     public function __construct(string $code, string $name, ?self $parent = null)
     {
         if (1 !== preg_match(self::CODE_PATTERN, $code)) {
-            throw new \InvalidArgumentException(\sprintf('Invalid domain code "%s" (lowercase letters, digits, "-" and "_").', $code));
+            throw new InvalidInput('admin.domain.invalid_domain_code_code_lowercase', ['{code}' => $code]);
         }
         $this->code = $code;
         $this->name = $name;
