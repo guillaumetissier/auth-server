@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\Access\AccessPolicy;
 use App\Entity\Domain;
 use App\Entity\User;
+use App\I18n\Text;
 use App\Repository\UserRepository;
 use App\TwoFactor\TwoFactorPolicy;
 use GuillaumeTissier\ResourceGuard\Access\AccessLevel;
@@ -60,7 +61,7 @@ final class DashboardController extends AbstractController
 
             $parameters['admin'] = [
                 'stats' => $this->users->stats($scope, $this->clock->now()),
-                'scope' => null === $scope ? 'all users' : 'the users of the domains you manage',
+                'scope' => null === $scope ? new Text('dashboard.scope_all_users') : new Text('dashboard.scope_domain_users'),
                 'recent_logins' => $this->users->recentLogins($scope),
                 'recent_domains' => $recentDomains,
                 'members' => $this->users->memberCounts($recentDomains),
@@ -74,7 +75,7 @@ final class DashboardController extends AbstractController
     }
 
     /**
-     * @return list<array{level: 'warn'|'info', text: string, link?: string, action?: string}>
+     * @return list<array{level: 'warn'|'info', text: Text, link?: string, action?: Text}>
      */
     private function notifications(User $user): array
     {
@@ -84,27 +85,27 @@ final class DashboardController extends AbstractController
             $notifications[] = [
                 'level' => 'warn',
                 'text' => match (true) {
-                    $user->isAdministrator() => 'Two-factor authentication is not enabled. Administrators need it: set it up now.',
-                    TwoFactorPolicy::MODE_GRACE === $this->twoFactorPolicy->mode() && null !== $deadline => \sprintf('Two-factor authentication is not enabled. It becomes required on %s.', $deadline->format('Y-m-d')),
-                    default => 'Two-factor authentication is not enabled. It protects your account even if your password leaks.',
+                    $user->isAdministrator() => new Text('dashboard.two_factor_authentication_is_not_enabled_administrators'),
+                    TwoFactorPolicy::MODE_GRACE === $this->twoFactorPolicy->mode() && null !== $deadline => new Text('dashboard.two_factor_authentication_is_not_enabled_it_becomes', ['{deadline}' => $deadline]),
+                    default => new Text('dashboard.two_factor_authentication_is_not_enabled_it_protects'),
                 },
                 'link' => $this->generateUrl('app_2fa_setup'),
-                'action' => 'Set it up',
+                'action' => new Text('dashboard.set_it_up'),
             ];
         } elseif ($user->countBackupCodes() < 3) {
             $notifications[] = [
                 'level' => 'warn',
-                'text' => \sprintf('Only %d backup code(s) left: generate new ones from your profile.', $user->countBackupCodes()),
+                'text' => new Text('dashboard.only_count_left_generate_new', ['{count}' => $user->countBackupCodes()]),
                 'link' => $this->generateUrl('app_account'),
-                'action' => 'My profile',
+                'action' => new Text('common.my_profile'),
             ];
         }
         if (null === $user->getEmail()) {
             $notifications[] = [
                 'level' => 'info',
-                'text' => 'Add an e-mail address to your profile: without it, you cannot reset a forgotten password yourself.',
+                'text' => new Text('dashboard.add_e_mail_address_to'),
                 'link' => $this->generateUrl('app_account'),
-                'action' => 'Add it',
+                'action' => new Text('dashboard.add_it'),
             ];
         }
 

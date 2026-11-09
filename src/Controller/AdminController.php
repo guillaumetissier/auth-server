@@ -6,6 +6,8 @@ namespace App\Controller;
 
 use App\Access\ResourceCatalog;
 use App\Entity\ResourceType;
+use App\I18n\InvalidInput;
+use App\I18n\Text;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -46,23 +48,23 @@ final class AdminController extends AbstractAdminController
             try {
                 if ('remove' === $mode) {
                     $this->catalog->remove($code, $actor);
-                    $message = \sprintf('"%s" removed.', $code);
+                    $message = new Text('admin.resource_types.code_removed', ['{code}' => $code]);
                 } else {
                     // Creating never overwrites an existing entry, editing never creates one.
                     $exists = isset($this->catalog->knownCodes()[$code]);
                     if ('edit' !== $mode && $exists) {
-                        throw new \InvalidArgumentException(\sprintf('"%s" already exists: use Edit to change it.', $code));
+                        throw new InvalidInput('admin.resource_types.code_already_exists_use_edit', ['{code}' => $code]);
                     }
                     if ('edit' === $mode && !$exists) {
-                        throw new \InvalidArgumentException(\sprintf('Unknown resource type or facet "%s".', $code));
+                        throw new InvalidInput('common.unknown_resource_type_or_facet', ['{code}' => $code]);
                     }
                     $this->catalog->declare($code, $request->request->getString('label'), self::optional($request, 'description'), $actor);
-                    $message = \sprintf('"%s" %s.', $code, 'edit' === $mode ? 'saved' : 'created');
+                    $message = 'edit' === $mode ? new Text('admin.resource_types.code_saved', ['{code}' => $code]) : new Text('admin.resource_types.code_created', ['{code}' => $code]);
                 }
                 $this->em->flush();
                 $this->addFlash('success', $message);
             } catch (\InvalidArgumentException|\DomainException $e) {
-                $this->addFlash('error', $e->getMessage());
+                $this->addFlash('error', Text::of($e));
             }
 
             return $this->redirectToRoute('app_admin_resource_types');

@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\Entity\ImpersonationSession;
 use App\Entity\User;
+use App\I18n\Text;
 use App\Impersonation\ImpersonationConfirmations;
 use App\Impersonation\ImpersonationManager;
 use App\Impersonation\ImpersonationPolicy;
@@ -66,7 +67,7 @@ final class ImpersonationController extends AbstractController
 
         $denial = $this->policy->denialReason($admin, $target);
         if (null !== $denial) {
-            throw $this->createAccessDeniedException($denial);
+            throw $this->createAccessDeniedException((string) $denial);
         }
 
         $errors = [];
@@ -74,13 +75,13 @@ final class ImpersonationController extends AbstractController
 
         if ($request->isMethod('POST')) {
             if (!$this->isCsrfTokenValid('impersonation_confirm', $request->request->getString('_csrf_token'))) {
-                $errors[] = 'Your session expired, please try again.';
+                $errors[] = new Text('common.session_expired_please_try_again');
             }
             if (mb_strlen($reason) < self::REASON_MIN_LENGTH || mb_strlen($reason) > self::REASON_MAX_LENGTH) {
-                $errors[] = \sprintf('Please give a reason (%d to %d characters).', self::REASON_MIN_LENGTH, self::REASON_MAX_LENGTH);
+                $errors[] = new Text('impersonation.please_give_reason_min_to', ['{min}' => self::REASON_MIN_LENGTH, '{max}' => self::REASON_MAX_LENGTH]);
             }
             if (!$this->isFreshTotpCode($admin, $request->request->getString('code'))) {
-                $errors[] = 'This authentication code is not valid.';
+                $errors[] = new Text('impersonation.authentication_code_is_not_valid');
             }
 
             if ([] === $errors) {

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Settings;
 
+use App\I18n\Text;
+
 /**
  * Lifetimes as stored (ISO 8601 durations: PT15M, P30D…) and as shown in the settings page
  * (an amount and a unit).
@@ -53,5 +55,19 @@ final class Duration
         [$amount, $unit] = self::split($iso);
 
         return $amount.' '.(1 === $amount ? rtrim($unit, 's') : $unit);
+    }
+
+    /**
+     * The duration in words, translated when displayed ("15 minutes", "15 minutes" in French, "15 Minuten").
+     */
+    public static function text(string $iso): Text
+    {
+        [$amount, $unit] = self::split($iso);
+
+        return match ($unit) {
+            'minutes' => new Text('duration.minutes', ['{n}' => $amount]),
+            'hours' => new Text('duration.hours', ['{n}' => $amount]),
+            'days' => new Text('duration.days', ['{n}' => $amount]),
+        };
     }
 }

@@ -3,32 +3,32 @@
 {% block title %}{{ profile.name }}{% endblock %}
 
 {% block content %}
-    <p class="sub"><a href="{{ path('app_admin_profiles') }}">Profiles</a></p>
+    <p class="sub"><a href="{{ path('app_admin_profiles') }}">{{ 'common.profiles'|trans }}</a></p>
     <h1>{{ profile.name }}</h1>
 
     <dl class="facts">
-        <dt>Code</dt><dd class="expr">{{ profile.code }}</dd>
-        <dt>Rights</dt><dd class="expr">{{ profile.expression }}</dd>
-        <dt>Description</dt><dd>{{ profile.description ?? '—' }}</dd>
-        <dt>Changed</dt><dd>{{ profile.updatedAt|date('Y-m-d H:i') }}</dd>
+        <dt>{{ 'admin.code'|trans }}</dt><dd class="expr">{{ profile.code }}</dd>
+        <dt>{{ 'common.rights'|trans }}</dt><dd class="expr">{{ profile.expression }}</dd>
+        <dt>{{ 'admin.description'|trans }}</dt><dd>{{ profile.description ?? '—' }}</dd>
+        <dt>{{ 'admin.profile.changed'|trans }}</dt><dd>{{ profile.updatedAt|locale_date('datetime') }}</dd>
     </dl>
     {% if can_edit %}
         <div class="actions">{{ include('admin/_profile_operations.html.twig', {p: profile, used: grants|length}) }}</div>
     {% endif %}
 
-    <h2>Given to</h2>
+    <h2>{{ 'admin.profile.given_to'|trans }}</h2>
     <table>
-        <thead><tr><th>User</th><th>Domain</th><th>Adjustments</th><th>Resulting rights</th></tr></thead>
+        <thead><tr><th>{{ 'common.user'|trans }}</th><th>{{ 'common.domain'|trans }}</th><th>{{ 'admin.profile.adjustments'|trans }}</th><th>{{ 'admin.profile.resulting_rights'|trans }}</th></tr></thead>
         <tbody>
         {% for g in grants %}
             <tr>
                 <td><a href="{{ path('app_admin_user', {id: g.user.id}) }}">{{ g.user.username }}</a></td>
-                <td class="expr">{{ g.domain.path }}{{ g.includesSubdomains ? ' and subdomains' : '' }}</td>
+                <td class="expr">{{ g.domain.path }}{{ g.includesSubdomains ? ' ' ~ 'admin.profile.and_subdomains'|trans : '' }}</td>
                 <td class="expr">{{ g.adjustments.isEmpty ? '—' : g.adjustments }}</td>
                 <td class="expr">{{ g.expression }}</td>
             </tr>
         {% else %}
-            <tr><td colspan="4" class="muted">Nobody has this profile yet: give it from a user's page (Rights).</td></tr>
+            <tr><td colspan="4" class="muted">{{ 'admin.profile.nobody_has_profile_yet_give'|trans }}</td></tr>
         {% endfor %}
         </tbody>
     </table>

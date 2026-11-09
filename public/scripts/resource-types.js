@@ -21,9 +21,10 @@
         event.preventDefault();
         pending = removeForm;
         const { code, label, facet } = removeForm.dataset;
-        confirm.querySelector('h2').textContent = `Remove the ${facet === '1' ? 'facet' : 'type'} ${code}?`;
-        confirm.querySelector('#rt-confirm-text').textContent =
-          `"${label}" (${code}) will no longer be accepted in access expressions.`;
+        // Translated texts come from the dialog's data attributes, with {code} and {label} to fill in.
+        const fill = (text) => text.replaceAll('{code}', code).replaceAll('{label}', label);
+        confirm.querySelector('h2').textContent = fill(facet === '1' ? confirm.dataset.titleFacet : confirm.dataset.titleType);
+        confirm.querySelector('#rt-confirm-text').textContent = fill(confirm.dataset.text);
         confirm.showModal();
         confirm.querySelector('[data-close-dialog]').focus(); // Cancel by default: Enter does not remove.
       });
@@ -70,9 +71,14 @@
         field('description').value = data.description ?? '';
       }
     }
-    field('label').placeholder = isFacet ? 'Prices' : 'Vehicles';
+    field('label').placeholder = isFacet ? field('label').dataset.placeholderFacet : field('label').dataset.placeholderType;
 
-    const titles = { type: 'New type', facet: 'New facet', edit: `Edit ${isFacet ? 'facet' : 'type'} ${data.code ?? ''}` };
+    // Translated titles: data attributes of the dialog.
+    const titles = {
+      type: dialog.dataset.titleType,
+      facet: dialog.dataset.titleFacet,
+      edit: (isFacet ? dialog.dataset.titleEditFacet : dialog.dataset.titleEditType).replaceAll('{code}', data.code ?? ''),
+    };
     dialog.querySelector('h2').textContent = titles[mode];
     dialog.showModal();
     (mode === 'edit' ? field('label') : mode === 'facet' ? field('facet') : code).focus();

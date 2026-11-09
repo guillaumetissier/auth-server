@@ -1,19 +1,17 @@
 {% extends 'admin/_layout.html.twig' %}
 
-{% block title %}Profiles{% endblock %}
+{% block title %}{{ 'common.profiles'|trans }}{% endblock %}
 
 {% block content %}
-    <h1>Profiles</h1>
-    <p class="sub">Named sets of rights ("Pricer", "Fleet manager"), given to users on a domain from their page instead of writing the
-        rights each time. Users stay linked to their profile: changing it changes their rights, from their next token. A user's rights
-        can still adjust his profile ("invoice:-": the profile, without invoices).</p>
+    <h1>{{ 'common.profiles'|trans }}</h1>
+    <p class="sub">{{ 'admin.profiles.named_sets_rights_pricer_fleet'|trans }}</p>
 
     {% if can_edit %}
-        <div class="actions toolbar"><button type="button" data-open-profile="create">New profile</button></div>
+        <div class="actions toolbar"><button type="button" data-open-profile="create">{{ 'admin.new_profile'|trans }}</button></div>
     {% endif %}
 
     <table>
-        <thead><tr><th>Profile</th><th>Rights</th><th>Description</th><th>Status</th>{% if can_edit %}<th class="num">Operations</th>{% endif %}</tr></thead>
+        <thead><tr><th>{{ 'admin.profile_label'|trans }}</th><th>{{ 'common.rights'|trans }}</th><th>{{ 'admin.description'|trans }}</th><th>{{ 'admin.status'|trans }}</th>{% if can_edit %}<th class="num">{{ 'admin.operations'|trans }}</th>{% endif %}</tr></thead>
         <tbody>
         {% for p in profiles %}
             {% set used = usage[p.code] ?? 0 %}
@@ -21,13 +19,13 @@
                 <td class="nowrap"><a href="{{ path('app_admin_profile', {code: p.code}) }}">{{ p.name }}</a> <span class="muted expr">{{ p.code }}</span></td>
                 <td class="expr">{{ p.expression }}</td>
                 <td class="muted">{{ p.description }}</td>
-                <td class="nowrap">{% if used > 0 %}<span class="badge in-use">given ({{ used }})</span>{% else %}<span class="muted">unused</span>{% endif %}</td>
+                <td class="nowrap">{% if used > 0 %}<span class="badge in-use">{{ 'admin.profiles.given_count'|trans({'{count}': used}) }}</span>{% else %}<span class="muted">{{ 'admin.unused'|trans }}</span>{% endif %}</td>
                 {% if can_edit %}
                     <td class="num nowrap">{{ include('admin/_profile_operations.html.twig', {p: p, used: used}) }}</td>
                 {% endif %}
             </tr>
         {% else %}
-            <tr><td colspan="{{ can_edit ? 5 : 4 }}" class="muted">No profile yet{{ can_edit ? ': create the first one with "New profile".' }}</td></tr>
+            <tr><td colspan="{{ can_edit ? 5 : 4 }}" class="muted">{{ (can_edit ? 'admin.profiles.no_profile_yet_create_first' : 'admin.profiles.no_profile_yet')|trans }}</td></tr>
         {% endfor %}
         </tbody>
     </table>

@@ -1,90 +1,102 @@
 {% extends '_app.html.twig' %}
 
-{% block title %}My profile{% endblock %}
+{% block title %}{{ 'common.my_profile'|trans }}{% endblock %}
 
 {% block content %}
-    <h1>My profile</h1>
+    <h1>{{ 'common.my_profile'|trans }}</h1>
 
     <div class="columns">
         <section>
-            <h2>Account</h2>
+            <h2>{{ 'common.account'|trans }}</h2>
             <dl>
-                <dt>Username</dt><dd><strong>{{ user.username }}</strong></dd>
-                <dt>User id</dt><dd class="expr">{{ user.externalUserId }}</dd>
-                <dt>E-mail</dt><dd>{{ user.email ?? '—' }}</dd>
-                <dt>Domain</dt><dd class="expr">{{ user.domain ? user.domain.path : '—' }}</dd>
-                <dt>Role</dt><dd>{% if 'ROLE_SUPER_ADMIN' in user.roles %}super-administrator{% elseif 'ROLE_ADMIN' in user.roles %}platform administrator{% else %}user{% endif %}</dd>
-                <dt>Member since</dt><dd>{{ user.createdAt|date('Y-m-d') }}</dd>
+                <dt>{{ 'common.username'|trans }}</dt><dd><strong>{{ user.username }}</strong></dd>
+                <dt>{{ 'common.user_id'|trans }}</dt><dd class="expr">{{ user.externalUserId }}</dd>
+                <dt>{{ 'common.e_mail'|trans }}</dt><dd>{{ user.email ?? '—' }}</dd>
+                <dt>{{ 'common.domain'|trans }}</dt><dd class="expr">{{ user.domain ? user.domain.path : '—' }}</dd>
+                <dt>{{ 'account.role'|trans }}</dt><dd>{% if 'ROLE_SUPER_ADMIN' in user.roles %}{{ 'account.super_administrator'|trans }}{% elseif 'ROLE_ADMIN' in user.roles %}{{ 'account.platform_administrator'|trans }}{% else %}{{ 'account.user'|trans }}{% endif %}</dd>
+                <dt>{{ 'account.member_since'|trans }}</dt><dd>{{ user.createdAt|locale_date }}</dd>
             </dl>
-            <p class="help">To change your username, ask an administrator.</p>
+            <p class="help">{{ 'account.to_change_username_ask_administrator'|trans }}</p>
 
-            <h3>E-mail address</h3>
+            <h3>{{ 'common.language'|trans }}</h3>
+            <form method="post" action="{{ path('app_account_language') }}">
+                <label for="locale">{{ 'account.language_pages_and_e_mails'|trans }}</label>
+                <select id="locale" name="locale">
+                    <option value="">{{ 'account.same_as_my_browser'|trans }}</option>
+                    {% for code, name in app_locales() %}<option value="{{ code }}" lang="{{ code }}" {{ code == user.locale ? 'selected' }}>{{ name }}</option>{% endfor %}
+                </select>
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('account_language') }}">
+                <button type="submit" class="secondary">{{ 'account.save_language'|trans }}</button>
+            </form>
+
+            <h3>{{ 'common.e_mail_address'|trans }}</h3>
             <form method="post" action="{{ path('app_account_email') }}">
-                <label for="email">E-mail address (where password links are sent)</label>
+                <label for="email">{{ 'account.e_mail_address_where_password'|trans }}</label>
                 <input type="email" id="email" name="email" value="{{ user.email }}" autocomplete="email">
-                <label for="email-password">Current password</label>
+                <label for="email-password">{{ 'account.current_password'|trans }}</label>
                 <input type="password" id="email-password" name="current_password" autocomplete="current-password" required>
                 <input type="hidden" name="_csrf_token" value="{{ csrf_token('account_email') }}">
-                <button type="submit" class="secondary">Save the e-mail address</button>
+                <button type="submit" class="secondary">{{ 'account.save_e_mail_address'|trans }}</button>
             </form>
         </section>
 
         <section>
-            <h2>Password</h2>
+            <h2>{{ 'common.password'|trans }}</h2>
             <form method="post" action="{{ path('app_account_password') }}">
                 <input type="text" name="username" value="{{ user.username }}" autocomplete="username" hidden>
-                <label for="current-password">Current password</label>
+                <label for="current-password">{{ 'account.current_password'|trans }}</label>
                 <input type="password" id="current-password" name="current_password" autocomplete="current-password" required>
-                <label for="new-password">New password (at least {{ min_length }} characters)</label>
+                <label for="new-password">{{ 'account.new_password_at_least_min'|trans({'{min}': min_length}) }}</label>
                 <input type="password" id="new-password" name="password" minlength="{{ min_length }}" autocomplete="new-password" required>
-                <label for="new-password-2">New password again</label>
+                <label for="new-password-2">{{ 'common.new_password_again'|trans }}</label>
                 <input type="password" id="new-password-2" name="confirmation" minlength="{{ min_length }}" autocomplete="new-password" required>
                 <input type="hidden" name="_csrf_token" value="{{ csrf_token('account_password') }}">
-                <button type="submit">Change the password</button>
+                <button type="submit">{{ 'account.change_password'|trans }}</button>
             </form>
-            <p class="help">Your applications will have to sign you in again.</p>
+            <p class="help">{{ 'account.applications_will_have_to_sign'|trans }}</p>
         </section>
     </div>
 
-    <h2>Two-factor authentication
-        {% if user.totpAuthenticationEnabled %}<span class="badge ok">enabled</span>{% else %}<span class="badge warn">not enabled</span>{% endif %}</h2>
+    <h2>{{ 'common.two_factor_authentication'|trans }}
+        {% if user.totpAuthenticationEnabled %}<span class="badge ok">{{ 'common.enabled'|trans }}</span>{% else %}<span class="badge warn">{{ 'common.not_enabled'|trans }}</span>{% endif %}</h2>
     {% if not user.totpAuthenticationEnabled %}
-        <p class="help">After your password, a 6-digit code from an app on your phone (Google Authenticator, Microsoft Authenticator, 2FAS…).</p>
-        <a class="button" href="{{ path('app_2fa_setup') }}">Set up two-factor authentication</a>
+        <p class="help">{{ 'account.after_password_6_digit_code'|trans }}</p>
+        <a class="button" href="{{ path('app_2fa_setup') }}">{{ 'account.set_up_two_factor_authentication'|trans }}</a>
     {% else %}
-        <p>Enabled since {{ user.totpEnabledAt|date('Y-m-d') }} · {{ user.countBackupCodes }} backup code(s) left.</p>
+        <p>{{ 'account.enabled_since_date_count_left'|trans({'{date}': user.totpEnabledAt|locale_date, '{count}': user.countBackupCodes}) }}</p>
         <div class="columns">
             <form method="post" action="{{ path('app_2fa_backup_codes_regenerate') }}">
-                <label for="code-regen">Current code (to confirm)</label>
+                <label for="code-regen">{{ 'account.current_code_to_confirm'|trans }}</label>
                 <input type="text" id="code-regen" name="code" class="code" inputmode="numeric" maxlength="6" required autocomplete="one-time-code">
                 <input type="hidden" name="_csrf_token" value="{{ csrf_token('totp_manage') }}">
-                <button type="submit" class="secondary">Generate new backup codes</button>
+                <button type="submit" class="secondary">{{ 'account.generate_new_backup_codes'|trans }}</button>
             </form>
             {% if can_disable %}
                 <form method="post" action="{{ path('app_2fa_disable') }}">
-                    <label for="code-disable">Current code (to confirm)</label>
+                    <label for="code-disable">{{ 'account.current_code_to_confirm'|trans }}</label>
                     <input type="text" id="code-disable" name="code" class="code" inputmode="numeric" maxlength="6" required autocomplete="one-time-code">
                     <input type="hidden" name="_csrf_token" value="{{ csrf_token('totp_manage') }}">
-                    <button type="submit" class="secondary">Disable two-factor authentication</button>
+                    <button type="submit" class="secondary">{{ 'account.disable_two_factor_authentication'|trans }}</button>
                 </form>
             {% endif %}
         </div>
     {% endif %}
 
-    <h2>My rights</h2>
+    <h2>{{ 'account.my_rights'|trans }}</h2>
     {% if grants is empty %}
-        <p class="muted">No rights granted to you directly.</p>
+        <p class="muted">{{ 'account.no_rights_granted_to_you'|trans }}</p>
     {% else %}
         <table>
-            <thead><tr><th>Domain</th><th>Subdomains</th><th>Rights</th></tr></thead>
+            <thead><tr><th>{{ 'common.domain'|trans }}</th><th>{{ 'common.subdomains'|trans }}</th><th>{{ 'common.rights'|trans }}</th></tr></thead>
             <tbody>
             {% for g in grants %}
-                <tr><td class="expr">{{ g.domain.path }}</td><td>{{ g.includesSubdomains ? 'yes' : 'no' }}</td><td class="expr">{{ g.expression }}</td></tr>
+                <tr><td class="expr">{{ g.domain.path }}</td><td>{{ (g.includesSubdomains ? 'common.yes' : 'common.no')|trans }}</td>
+                    <td>{% if g.profile %}<span class="badge">{{ g.profile.name }}</span> {% endif %}<span class="expr">{{ g.expression }}</span></td></tr>
             {% endfor %}
             </tbody>
         </table>
     {% endif %}
     {% if can_administer %}
-        <p class="help">You can administer users and domains: see <a href="{{ path('app_admin_users') }}">Users</a> and <a href="{{ path('app_admin_domains') }}">Domains</a>.</p>
+        <p class="help">{{ 'account.you_can_administer_users_and'|trans({'{users}': path('app_admin_users'), '{domains}': path('app_admin_domains')})|raw }}</p>
     {% endif %}
 {% endblock %}

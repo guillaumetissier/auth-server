@@ -8,6 +8,7 @@ use App\Entity\AccessGrant;
 use App\Entity\Domain;
 use App\Entity\ResourceType;
 use App\Entity\User;
+use App\I18n\Text;
 use App\Repository\DomainRepository;
 use GuillaumeTissier\ResourceGuard\Access\AccessExpression;
 use GuillaumeTissier\ResourceGuard\Access\AccessLevel;
@@ -111,14 +112,14 @@ final readonly class AccessPolicy
     }
 
     /**
-     * @return string|null why $actor may not set the owner and owner rights of $domain, null when allowed
+     * @return Text|null why $actor may not set the owner and owner rights of $domain, null when allowed
      */
-    public function ownerChangeDenial(User $actor, Domain $domain, ?User $owner, AccessExpression $ownerExpression): ?string
+    public function ownerChangeDenial(User $actor, Domain $domain, ?User $owner, AccessExpression $ownerExpression): ?Text
     {
         if (null !== $owner) {
             $ownerDomain = $owner->getDomain();
             if (null !== $ownerDomain && !$domain->isWithin($ownerDomain)) {
-                return 'The owner must belong to this domain or to a domain above it.';
+                return new Text('access.policy.owner_must_belong_to_domain');
             }
         }
         if (null !== ($error = $this->unknownTypes($ownerExpression))) {
@@ -130,10 +131,10 @@ final readonly class AccessPolicy
         // Owners are set from above: nobody sets the rights of his own domain's owner.
         $parent = $domain->getParent();
         if (null === $parent || !$this->levelOn($actor, '@domain', $parent)->includes(AccessLevel::Write)) {
-            return 'You cannot change the owner of this domain.';
+            return new Text('access.policy.you_cannot_change_owner_domain');
         }
         if (!$this->isWithinActorRights($actor, $domain, true, $ownerExpression)) {
-            return 'The owner rights exceed your own rights on this domain.';
+            return new Text('access.policy.owner_rights_exceed_own_rights');
         }
 
         return null;
@@ -150,34 +151,34 @@ final readonly class AccessPolicy
     }
 
     /**
-     * @return string|null why $actor may not change the rights (grants, domain) of $target, null when allowed
+     * @return Text|null why $actor may not change the rights (grants, domain) of $target, null when allowed
      */
-    public function rightsChangeDenial(User $actor, User $target): ?string
+    public function rightsChangeDenial(User $actor, User $target): ?Text
     {
         if ($this->isSuperAdmin($actor)) {
             return null;
         }
         if ($actor->getId() === $target->getId()) {
-            return 'You cannot change your own rights.';
+            return new Text('access.policy.you_cannot_change_own_rights');
         }
         if ($this->isPlatformStaff($target)) {
-            return 'Only the super-administrator can change the rights of platform administrators.';
+            return new Text('access.policy.only_super_administrator_can_change_rights');
         }
         $domain = $target->getDomain();
         if (null === $domain || !$this->levelOn($actor, '@access', $domain)->includes(AccessLevel::Write)) {
-            return 'You are not allowed to change the rights of this user.';
+            return new Text('access.policy.you_are_not_allowed_to_change');
         }
         if ($this->isAboveOrOwnerOf($target, $actor)) {
-            return 'You cannot change the rights of the owner of your domain.';
+            return new Text('access.policy.you_cannot_change_rights_owner');
         }
 
         return null;
     }
 
     /**
-     * @return string|null why $actor may not give $target this grant, null when allowed
+     * @return Text|null why $actor may not give $target this grant, null when allowed
      */
-    public function grantDenial(User $actor, User $target, Domain $domain, AccessExpression $expression, bool $includeSubdomains, ?AccessGrant $existing = null): ?string
+    public function grantDenial(User $actor, User $target, Domain $domain, AccessExpression $expression, bool $includeSubdomains, ?AccessGrant $existing = null): ?Text
     {
         if (null !== ($denial = $this->rightsChangeDenial($actor, $target))) {
             return $denial;
@@ -187,43 +188,43 @@ final readonly class AccessPolicy
         }
         $targetDomain = $target->getDomain();
         if (null !== $targetDomain && !$domain->isWithin($targetDomain)) {
-            return \sprintf('%s belongs to domain "%s": rights can only be granted on it or its subdomains.', $target->getUsername(), $targetDomain->getCode());
+            return new Text('access.policy.username_belongs_to_domain_domain', ['{username}' => $target->getUsername(), '{domain}' => $targetDomain->getCode()]);
         }
         if ($this->isSuperAdmin($actor)) {
             return null;
         }
         if (!$this->levelOn($actor, '@access', $domain, $includeSubdomains)->includes(AccessLevel::Write)) {
-            return 'You are not allowed to manage rights on this domain.';
+            return new Text('access.policy.you_are_not_allowed_to_manage_rights');
         }
         if (!$this->isWithinActorRights($actor, $domain, $includeSubdomains, $expression)) {
-            return 'These rights exceed your own rights on this domain.';
+            return new Text('access.policy.rights_exceed_own_rights_on');
         }
         if (null !== $existing && !$this->isWithinActorRights($actor, $existing->getDomain(), $existing->includesSubdomains(), $existing->getExpression())) {
-            return 'The current rights exceed your own: only someone holding them can change them.';
+            return new Text('access.policy.current_rights_exceed_own_only');
         }
 
         return null;
     }
 
     /**
-     * @return string|null why $actor may not remove this grant, null when allowed
+     * @return Text|null why $actor may not remove this grant, null when allowed
      */
-    public function revokeDenial(User $actor, AccessGrant $grant): ?string
+    public function revokeDenial(User $actor, AccessGrant $grant): ?Text
     {
         if (null !== ($denial = $this->rightsChangeDenial($actor, $grant->getUser()))) {
             return $denial;
         }
         if (!$this->isSuperAdmin($actor) && !$this->isWithinActorRights($actor, $grant->getDomain(), $grant->includesSubdomains(), $grant->getExpression())) {
-            return 'These rights exceed your own: only someone holding them can remove them.';
+            return new Text('access.policy.rights_exceed_own_only_someone');
         }
 
         return null;
     }
 
     /**
-     * @return string|null why $actor may not move $target to $domain, null when allowed
+     * @return Text|null why $actor may not move $target to $domain, null when allowed
      */
-    public function domainChangeDenial(User $actor, User $target, ?Domain $domain): ?string
+    public function domainChangeDenial(User $actor, User $target, ?Domain $domain): ?Text
     {
         if (null !== ($denial = $this->rightsChangeDenial($actor, $target))) {
             return $denial;
@@ -232,7 +233,7 @@ final readonly class AccessPolicy
             return null;
         }
         if (null === $domain || !$this->levelOn($actor, '@access', $domain)->includes(AccessLevel::Write)) {
-            return 'You are not allowed to move users to this domain.';
+            return new Text('access.policy.you_are_not_allowed_to_move');
         }
 
         return null;
@@ -266,65 +267,65 @@ final readonly class AccessPolicy
      * Account changes made by someone else: identity, password link, 2FA reset, disabling, deletion.
      * Same bounds as for rights; one's own account is changed from the profile page.
      *
-     * @return string|null why $actor may not change the account of $target, null when allowed
+     * @return Text|null why $actor may not change the account of $target, null when allowed
      */
-    public function accountChangeDenial(User $actor, User $target): ?string
+    public function accountChangeDenial(User $actor, User $target): ?Text
     {
         if ($actor->getId() === $target->getId()) {
-            return 'This is your own account: change it from your profile page.';
+            return new Text('access.policy.is_own_account_change_it');
         }
         if ($target->hasRole(User::ROLE_SUPER_ADMIN)) {
-            return 'The super-administrator account is changed by its holder only.';
+            return new Text('access.policy.super_administrator_account_is_changed');
         }
         if ($this->isSuperAdmin($actor)) {
             return null;
         }
         if ($this->isPlatformStaff($actor)) {
-            return 'Platform administrators see the accounts but do not change them: ask the super-administrator.';
+            return new Text('access.policy.platform_administrators_see_accounts_but');
         }
         if ($this->isPlatformStaff($target)) {
-            return 'Only the super-administrator can change the accounts of platform administrators.';
+            return new Text('access.policy.only_super_administrator_can_change_accounts');
         }
         $domain = $target->getDomain();
         if (null === $domain || !$this->levelOn($actor, '@access', $domain)->includes(AccessLevel::Write)) {
-            return 'You are not allowed to manage this account.';
+            return new Text('access.policy.you_are_not_allowed_to_manage_account');
         }
         if ($this->isAboveOrOwnerOf($target, $actor)) {
-            return 'You cannot manage the account of the owner of your domain.';
+            return new Text('access.policy.you_cannot_manage_account_owner');
         }
 
         return null;
     }
 
     /**
-     * @return string|null why $actor may not rename $domain, null when allowed
+     * @return Text|null why $actor may not rename $domain, null when allowed
      */
-    public function domainRenameDenial(User $actor, Domain $domain): ?string
+    public function domainRenameDenial(User $actor, Domain $domain): ?Text
     {
         if ($this->isSuperAdmin($actor)) {
             return null;
         }
         $parent = $domain->getParent();
         if (null === $parent || !$this->levelOn($actor, '@domain', $parent)->includes(AccessLevel::Write)) {
-            return 'Only who manages the parent domain can rename this domain.';
+            return new Text('access.policy.only_who_manages_parent_domain_can_rename');
         }
 
         return null;
     }
 
     /**
-     * @return string|null why $actor may not delete $domain, null when allowed
+     * @return Text|null why $actor may not delete $domain, null when allowed
      */
-    public function domainDeleteDenial(User $actor, Domain $domain, int $members, int $subdomains): ?string
+    public function domainDeleteDenial(User $actor, Domain $domain, int $members, int $subdomains): ?Text
     {
-        if (null !== ($denial = $this->domainRenameDenial($actor, $domain))) {
-            return str_replace('rename', 'delete', $denial);
+        if (null !== $this->domainRenameDenial($actor, $domain)) {
+            return new Text('access.policy.only_who_manages_parent_domain_can_delete');
         }
         if ($subdomains > 0) {
-            return \sprintf('The domain has %d subdomain(s): delete or move them first.', $subdomains);
+            return new Text('access.policy.domain_has_count_delete_or', ['{count}' => $subdomains]);
         }
         if ($members > 0) {
-            return \sprintf('The domain has %d user(s): move them to another domain first.', $members);
+            return new Text('access.policy.domain_has_count_move_them', ['{count}' => $members]);
         }
 
         return null;
@@ -383,9 +384,9 @@ final readonly class AccessPolicy
     }
 
     /**
-     * @return string|null an error naming the undeclared resource types and facets, null when all are known
+     * @return Text|null an error naming the undeclared resource types and facets, null when all are known
      */
-    public function unknownTypes(AccessExpression $expression): ?string
+    public function unknownTypes(AccessExpression $expression): ?Text
     {
         return $this->catalog->unknownTypes($expression);
     }

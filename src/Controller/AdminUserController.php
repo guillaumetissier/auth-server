@@ -17,6 +17,7 @@ use App\Entity\Domain;
 use App\Entity\ResourceType;
 use App\Entity\User;
 use App\Event\AccountEvent;
+use App\I18n\Text;
 use App\Impersonation\ImpersonationPolicy;
 use Doctrine\ORM\EntityManagerInterface;
 use GuillaumeTissier\ResourceGuard\Access\AccessExpression;
@@ -86,20 +87,20 @@ final class AdminUserController extends AbstractAdminController
             $this->checkCsrf($request, 'admin_user');
             $domain = '' === $values['domain'] ? null : $this->findDomain($values['domain']);
             $error = match (true) {
-                '' === $values['external_user_id'] || mb_strlen($values['external_user_id']) > 64 => 'Give the id of the user in your application (1 to 64 characters).',
-                '' === $values['email'] => 'Give an e-mail address: the invitation to choose a password is sent there.',
-                null === $domain && !$this->policy->isSuperAdmin($actor) => 'Choose the domain of the user.',
-                null !== $domain && !\in_array($domain, $domains, true) => 'You cannot create users in this domain.',
+                '' === $values['external_user_id'] || mb_strlen($values['external_user_id']) > 64 => new Text('admin.user.give_id_user_in_application'),
+                '' === $values['email'] => new Text('admin.user.give_e_mail_address_invitation'),
+                null === $domain && !$this->policy->isSuperAdmin($actor) => new Text('admin.user.choose_domain_user'),
+                null !== $domain && !\in_array($domain, $domains, true) => new Text('admin.user.you_cannot_create_users_in'),
                 default => $this->accounts->identityProblem($values['username'], $values['email']),
             };
             if (null === $error) {
                 try {
                     $user = $this->accounts->create($values['username'], $values['external_user_id'], $values['email'], $domain, $actor);
-                    $this->sendLink($user, PasswordLinks::INVITATION, $actor, 'Account created. An invitation to choose a password was sent to %s.');
+                    $this->sendLink($user, PasswordLinks::INVITATION, $actor, new Text('admin.user.account_created_invitation_to_choose', ['{email}' => (string) $user->getEmail()]));
 
                     return $this->redirectToRoute('app_admin_user', ['id' => $user->getId()]);
                 } catch (\InvalidArgumentException $e) {
-                    $error = $e->getMessage();
+                    $error = Text::of($e);
                 }
             }
             $this->addFlash('error', $error);
@@ -170,7 +171,7 @@ final class AdminUserController extends AbstractAdminController
             $this->addFlash('error', $problem);
         } else {
             $this->accounts->updateIdentity($target, $username, $email, $actor);
-            $this->addFlash('success', 'Account saved.');
+            $this->addFlash('success', new Text('admin.user.account_saved'));
         }
 
         return $this->redirectToRoute('app_admin_user', ['id' => $id]);
@@ -181,11 +182,11 @@ final class AdminUserController extends AbstractAdminController
     {
         [$actor, $target] = $this->managed($request, $id);
         if (null === $target->getEmail()) {
-            $this->addFlash('error', 'This account has no e-mail address: add one first.');
+            $this->addFlash('error', new Text('admin.user.account_has_no_e_mail'));
         } elseif (!$target->isEnabled()) {
-            $this->addFlash('error', 'This account is disabled: enable it first.');
+            $this->addFlash('error', new Text('admin.user.account_is_disabled_enable_it'));
         } else {
-            $this->sendLink($target, PasswordLinks::RESET, $actor, 'A link to choose a new password was sent to %s. The current password keeps working until then.');
+            $this->sendLink($target, PasswordLinks::RESET, $actor, new Text('admin.user.link_to_choose_new_password', ['{email}' => (string) $target->getEmail()]));
         }
 
         return $this->redirectToRoute('app_admin_user', ['id' => $id]);
@@ -197,7 +198,7 @@ final class AdminUserController extends AbstractAdminController
         [$actor, $target] = $this->managed($request, $id);
         if ($target->isTotpAuthenticationEnabled()) {
             $this->accounts->resetTwoFactor($target, $actor);
-            $this->addFlash('success', \sprintf('Two-factor authentication removed. %s sets it up again at the next sign-in.', $target->getUsername()));
+            $this->addFlash('success', new Text('admin.user.two_factor_authentication_removed_username', ['{username}' => $target->getUsername()]));
         }
 
         return $this->redirectToRoute('app_admin_user', ['id' => $id]);
@@ -210,8 +211,8 @@ final class AdminUserController extends AbstractAdminController
         $enabled = $request->request->getBoolean('enabled');
         $this->accounts->setEnabled($target, $enabled, $actor);
         $this->addFlash('success', $enabled
-            ? \sprintf('%s can sign in again.', $target->getUsername())
-            : \sprintf('%s can no longer sign in, and the applications can no longer renew his tokens.', $target->getUsername()));
+            ? new Text('admin.user.username_can_sign_in_again', ['{username}' => $target->getUsername()])
+            : new Text('admin.user.username_can_no_longer_sign', ['{username}' => $target->getUsername()]));
 
         return $this->redirectToRoute('app_admin_user', ['id' => $id]);
     }
@@ -221,14 +222,14 @@ final class AdminUserController extends AbstractAdminController
     {
         [$actor, $target] = $this->managed($request, $id);
         if ($request->request->getString('confirm') !== $target->getUsername()) {
-            $this->addFlash('error', \sprintf('Type the username (%s) to confirm the deletion.', $target->getUsername()));
+            $this->addFlash('error', new Text('admin.user.type_username_username_to_confirm', ['{username}' => $target->getUsername()]));
 
             return $this->redirectToRoute('app_admin_user', ['id' => $id]);
         }
 
         $username = $target->getUsername();
         $this->accounts->delete($target, $actor);
-        $this->addFlash('success', \sprintf('Account %s deleted.', $username));
+        $this->addFlash('success', new Text('admin.user.account_username_deleted', ['{username}' => $username]));
 
         return $this->redirectToRoute('app_admin_users');
     }
@@ -252,25 +253,27 @@ final class AdminUserController extends AbstractAdminController
             // Without a profile: the rights. With one: the adjustments of its rights, possibly none.
             $expression = AccessExpression::parse($request->request->getString('rights'));
         } catch (InvalidAccessExpression $e) {
-            $this->addFlash('error', $e->getMessage());
+            $this->addFlash('error', new Text('admin.user.invalid_rights_error', ['{error}' => $e->getMessage()]));
 
             return $this->redirectToRoute('app_admin_user', ['id' => $id, 'preview' => $domain->getCode()]);
         }
         $rights = null === $profile ? $expression : AccessProfile::combine($profile->getExpression(), $expression);
         $denial = $rights->isEmpty()
-            ? 'Give at least one rule, or remove the grant.'
+            ? new Text('admin.user.give_at_least_one_rule')
             : $this->policy->grantDenial($actor, $target, $domain, $rights, $includeSubdomains, $this->manager->findGrant($target, $domain));
 
         if (null !== $denial) {
             $this->addFlash('error', $denial);
         } else {
             $this->manager->grant($target, $domain, $expression, $includeSubdomains, $actor, $profile);
-            $this->addFlash('success', \sprintf(
-                'Rights on %s saved%s. They apply from the next token of %s.',
-                $domain->getPath(),
-                null === $profile ? '' : \sprintf(' (profile %s: %s)', $profile->getName(), $rights->toString()),
-                $target->getUsername(),
-            ));
+            $this->addFlash('success', null === $profile
+                ? new Text('admin.user.rights_on_domain_saved_they', ['{domain}' => $domain->getPath(), '{username}' => $target->getUsername()])
+                : new Text('admin.user.rights_on_domain_saved_profile', [
+                    '{domain}' => $domain->getPath(),
+                    '{profile}' => $profile->getName(),
+                    '{rights}' => $rights->toString(),
+                    '{username}' => $target->getUsername(),
+                ]));
         }
 
         return $this->redirectToRoute('app_admin_user', ['id' => $id, 'preview' => $domain->getCode()]);
@@ -291,7 +294,7 @@ final class AdminUserController extends AbstractAdminController
             $this->addFlash('error', $denial);
         } else {
             $this->manager->revoke($entity, $actor);
-            $this->addFlash('success', 'Rights removed.');
+            $this->addFlash('success', new Text('admin.user.rights_removed'));
         }
 
         return $this->redirectToRoute('app_admin_user', ['id' => $id]);
@@ -313,7 +316,9 @@ final class AdminUserController extends AbstractAdminController
             'roles' => implode(',', $target->getRoles()),
             'actor_id' => $actor->getExternalUserId(),
         ]));
-        $this->addFlash('success', \sprintf('%s is %s platform administrator.', $target->getUsername(), $target->hasRole(User::ROLE_ADMIN) ? 'now a' : 'no longer a'));
+        $this->addFlash('success', $target->hasRole(User::ROLE_ADMIN)
+            ? new Text('admin.user.username_is_now_platform_administrator', ['{username}' => $target->getUsername()])
+            : new Text('admin.user.username_is_no_longer_platform', ['{username}' => $target->getUsername()]));
 
         return $this->redirectToRoute('app_admin_user', ['id' => $id]);
     }
@@ -330,7 +335,7 @@ final class AdminUserController extends AbstractAdminController
         $target = $this->target($id);
         $denial = $this->policy->accountChangeDenial($actor, $target);
         if (null !== $denial) {
-            throw $this->createAccessDeniedException($denial);
+            throw $this->createAccessDeniedException((string) $denial);
         }
 
         return [$actor, $target];
@@ -339,13 +344,13 @@ final class AdminUserController extends AbstractAdminController
     /**
      * @param PasswordLinks::RESET|PasswordLinks::INVITATION $purpose
      */
-    private function sendLink(User $user, string $purpose, User $actor, string $success): void
+    private function sendLink(User $user, string $purpose, User $actor, Text $success): void
     {
         try {
             $this->passwordLinks->send($user, $purpose, $actor);
-            $this->addFlash('success', \sprintf($success, $user->getEmail()));
+            $this->addFlash('success', $success);
         } catch (TransportExceptionInterface $e) {
-            $this->addFlash('error', 'The e-mail could not be sent ('.$e->getMessage().'). Check the MAILER_DSN setting, then use "Send a password link".');
+            $this->addFlash('error', new Text('admin.user.e_mail_could_not_be', ['{error}' => $e->getMessage()]));
         }
     }
 

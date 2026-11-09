@@ -6,14 +6,19 @@ namespace App\Account;
 
 use App\Entity\User;
 use App\Event\AccountEvent;
+use App\I18n\Locales;
+use App\I18n\Text;
 use App\Repository\UserRepository;
+use App\Settings\SystemSettings;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Clock\ClockInterface;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Address;
+use Symfony\Component\Translation\LocaleSwitcher;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * Single-use links to choose a password, sent by e-mail:
@@ -34,6 +39,9 @@ final readonly class PasswordLinks
         private MailerInterface $mailer,
         private ClockInterface $clock,
         private EventDispatcherInterface $dispatcher,
+        private LocaleSwitcher $localeSwitcher,
+        private TranslatorInterface $translator,
+        private SystemSettings $settings,
         private string $issuer,
         #[Autowire('%env(PASSWORD_RESET_TTL)%')] private string $resetTtl,
         #[Autowire('%env(PASSWORD_INVITATION_TTL)%')] private string $invitationTtl,
@@ -54,9 +62,11 @@ final readonly class PasswordLinks
         $user->setPasswordLink(self::hash($secret), $expiresAt);
         $this->em->flush();
 
-        $this->mailer->send((new TemplatedEmail())
+        // In the recipient's language, not in the language of whoever sends it (an administrator).
+        $locale = Locales::isEnabled($user->getLocale()) ? (string) $user->getLocale() : $this->settings->defaultLocale();
+        $this->localeSwitcher->runWithLocale($locale, fn () => $this->mailer->send((new TemplatedEmail())
             ->to(new Address($email, $user->getUsername()))
-            ->subject(self::INVITATION === $purpose ? 'Your new account' : 'Choose a new password')
+            ->subject((self::INVITATION === $purpose ? new Text('email.password_link.new_account') : new Text('email.password_link.choose_new_password'))->trans($this->translator, $locale))
             ->htmlTemplate('email/password_link.html.twig')
             ->textTemplate('email/password_link.txt.twig')
             ->context([
@@ -64,7 +74,7 @@ final readonly class PasswordLinks
                 'username' => $user->getUsername(),
                 'url' => rtrim($this->issuer, '/').'/password/set/'.$secret,
                 'expires_at' => $expiresAt,
-            ]));
+            ])));
 
         $this->dispatcher->dispatch(new AccountEvent(AccountEvent::USER_PASSWORD_LINK_SENT, $user, [
             'purpose' => $purpose,

@@ -64,7 +64,7 @@ final class ResourceCatalogTest extends AdminTestCase
         self::assertNull($this->catalog->unknownTypes(AccessExpression::parse('vehicle:r vehicle.pricing:w @access:r')));
         self::assertSame(
             'Unknown resource type(s) or facet(s): vehicle.media, tire. Declare them first.',
-            $this->catalog->unknownTypes(AccessExpression::parse('vehicle.media:w tire:r')),
+            (string) $this->catalog->unknownTypes(AccessExpression::parse('vehicle.media:w tire:r')),
         );
     }
 
@@ -90,7 +90,7 @@ final class ResourceCatalogTest extends AdminTestCase
         $this->grantTo('south', 'a11', 'vehicle.pricing:w');
 
         self::assertSame(['vehicle' => 3, 'vehicle.pricing' => 1], array_intersect_key($this->catalog->usageCounts(), ['vehicle' => 0, 'vehicle.pricing' => 0]));
-        self::assertSame(['rights of south on /a1/a11/'], $this->catalog->usages('vehicle.pricing'));
+        self::assertSame(['rights of south on /a1/a11/'], array_map(strval(...), $this->catalog->usages('vehicle.pricing')));
 
         try {
             $this->catalog->remove('vehicle.pricing');

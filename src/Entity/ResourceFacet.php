@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Entity;
 
+use App\I18n\InvalidInput;
 use Doctrine\ORM\Mapping as ORM;
 use GuillaumeTissier\ResourceGuard\Access\AccessExpression;
 
@@ -39,7 +40,7 @@ class ResourceFacet
     public function __construct(ResourceType $type, string $name, string $label, ?string $description = null)
     {
         if (1 !== preg_match(self::NAME_PATTERN, $name)) {
-            throw new \InvalidArgumentException(\sprintf('Invalid facet "%s" (lowercase letters, digits, "-" and "_", starting with a letter).', $name));
+            throw new InvalidInput('access.catalog.invalid_facet_code_lowercase_letters', ['{code}' => $name]);
         }
         $this->type = $type;
         $this->name = $name;

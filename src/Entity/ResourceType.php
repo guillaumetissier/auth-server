@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Entity;
 
+use App\I18n\InvalidInput;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -43,7 +44,7 @@ class ResourceType
     public function __construct(string $code, string $label)
     {
         if (1 !== preg_match(self::CODE_PATTERN, $code)) {
-            throw new \InvalidArgumentException(\sprintf('Invalid resource type "%s" (lowercase letters, digits, "-" and "_", starting with a letter).', $code));
+            throw new InvalidInput('access.catalog.invalid_resource_type_code_lowercase', ['{code}' => $code]);
         }
         $this->code = $code;
         $this->label = $label;

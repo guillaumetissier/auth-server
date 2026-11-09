@@ -110,7 +110,7 @@ final readonly class DomainCommand
     private function ownerDenial(Domain $domain, ?User $owner, AccessExpression $expression): ?string
     {
         if (null !== ($error = $this->policy->unknownTypes($expression))) {
-            return $error;
+            return (string) $error;
         }
         $ownerDomain = $owner?->getDomain();
         if (null !== $ownerDomain && !$domain->isWithin($ownerDomain)) {

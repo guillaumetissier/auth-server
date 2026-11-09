@@ -7,44 +7,43 @@
         {% for a in ancestors %}<a href="{{ path('app_admin_domain', {code: a.code}) }}">{{ a.code }}</a> / {% endfor %}
     </p>
     <h1>{{ domain.name }} <span class="badge">{{ domain.code }}</span></h1>
-    <p class="sub expr">{{ domain.path }} · created {{ domain.createdAt|date('Y-m-d') }}</p>
+    <p class="sub expr">{{ domain.path }} · {{ 'admin.domain.created_date'|trans({'{date}': domain.createdAt|locale_date}) }}</p>
 
     {% if not rename_denial %}
         <form method="post" action="{{ path('app_admin_domain_rename', {code: domain.code}) }}">
             <div class="row">
-                <div class="grow"><label for="d-name">Name</label><input type="text" id="d-name" name="name" value="{{ domain.name }}" required maxlength="255"></div>
-                <div><button type="submit" class="secondary">Rename</button></div>
+                <div class="grow"><label for="d-name">{{ 'common.name'|trans }}</label><input type="text" id="d-name" name="name" value="{{ domain.name }}" required maxlength="255"></div>
+                <div><button type="submit" class="secondary">{{ 'admin.domain.rename'|trans }}</button></div>
             </div>
-            <p class="help">The code <code>{{ domain.code }}</code> and the path never change: applications store them with their resources.</p>
+            <p class="help">{{ 'admin.domain.code_code_and_path_never'|trans({'{code}': domain.code|e})|raw }}</p>
             <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_domain') }}">
         </form>
     {% endif %}
 
-    <h2>Owner</h2>
-    <p class="help">The owner is the super user of the domain: he holds the owner rights on this domain and all its subdomains.
-        Add <code>@impersonate:r</code> (read-only) or <code>@impersonate:w</code> (full) to let him impersonate the users of his domain.</p>
+    <h2>{{ 'admin.owner'|trans }}</h2>
+    <p class="help">{{ 'admin.domain.owner_is_super_user_domain'|trans|raw }}</p>
     {% if can_change_owner %}
         <form method="post" action="{{ path('app_admin_domain_owner', {code: domain.code}) }}">
             <div class="row">
-                <div><label for="owner">Owner (username, empty: none)</label><input type="text" id="owner" name="owner" value="{{ domain.owner ? domain.owner.username : '' }}"></div>
-                <div class="grow"><label for="owner-rights">Owner rights</label><input type="text" id="owner-rights" name="owner_rights" class="expr" value="{{ domain.ownerExpression }}" required></div>
-                <div><button type="submit">Save</button></div>
+                <div><label for="owner">{{ 'admin.domain.owner_username_empty_none'|trans }}</label><input type="text" id="owner" name="owner" value="{{ domain.owner ? domain.owner.username : '' }}"></div>
+                <div class="grow"><label for="owner-rights">{{ 'admin.owner_rights'|trans }}</label><input type="text" id="owner-rights" name="owner_rights" class="expr" value="{{ domain.ownerExpression }}" required></div>
+                <div><button type="submit">{{ 'admin.save'|trans }}</button></div>
             </div>
             <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_domain') }}">
         </form>
     {% else %}
         <dl>
-            <dt>Owner</dt><dd>{{ domain.owner ? domain.owner.username : '—' }}</dd>
-            <dt>Owner rights</dt><dd class="expr">{{ domain.ownerExpression }}</dd>
+            <dt>{{ 'admin.owner'|trans }}</dt><dd>{{ domain.owner ? domain.owner.username : '—' }}</dd>
+            <dt>{{ 'admin.owner_rights'|trans }}</dt><dd class="expr">{{ domain.ownerExpression }}</dd>
         </dl>
     {% endif %}
 
-    <h2>Subdomains</h2>
+    <h2>{{ 'common.subdomains'|trans }}</h2>
     {% if children is empty %}
-        <p class="muted">None.</p>
+        <p class="muted">{{ 'admin.domain.none'|trans }}</p>
     {% else %}
         <table>
-            <thead><tr><th>Domain</th><th>Name</th><th>Owner</th></tr></thead>
+            <thead><tr><th>{{ 'common.domain'|trans }}</th><th>{{ 'common.name'|trans }}</th><th>{{ 'admin.owner'|trans }}</th></tr></thead>
             <tbody>
             {% for c in children %}
                 <tr><td><a href="{{ path('app_admin_domain', {code: c.code}) }}">{{ c.code }}</a></td><td>{{ c.name }}</td><td>{{ c.owner ? c.owner.username : '—' }}</td></tr>
@@ -53,37 +52,37 @@
         </table>
     {% endif %}
     {% if can_create_subdomain %}
-        <h3>New subdomain</h3>
+        <h3>{{ 'admin.domain.new_subdomain'|trans }}</h3>
         {% include 'admin/_domain_form.html.twig' with {parent: domain} %}
     {% endif %}
 
     {% if can_see_users %}
-        <h2>Users ({{ members|length }})</h2>
+        <h2>{{ 'admin.domain.users_count'|trans({'{count}': members|length}) }}</h2>
         {% if members is empty %}
-            <p class="muted">Nobody belongs to this domain directly.</p>
+            <p class="muted">{{ 'admin.domain.nobody_belongs_to_domain_directly'|trans }}</p>
         {% else %}
             <table>
-                <thead><tr><th>Username</th><th>User id</th><th>Two-factor</th><th></th></tr></thead>
+                <thead><tr><th>{{ 'common.username'|trans }}</th><th>{{ 'common.user_id'|trans }}</th><th>{{ 'admin.two_factor'|trans }}</th><th></th></tr></thead>
                 <tbody>
                 {% for u in members %}
                     <tr>
-                        <td><a href="{{ path('app_admin_user', {id: u.id}) }}">{{ u.username }}</a>{% if domain.owner and domain.owner.id == u.id %} <span class="badge">owner</span>{% endif %}</td>
+                        <td><a href="{{ path('app_admin_user', {id: u.id}) }}">{{ u.username }}</a>{% if domain.owner and domain.owner.id == u.id %} <span class="badge">{{ 'admin.domain.owner'|trans }}</span>{% endif %}</td>
                         <td class="expr">{{ u.externalUserId }}</td>
-                        <td>{{ u.totpAuthenticationEnabled ? 'yes' : '—' }}</td>
-                        <td>{% if not u.enabled %}<span class="badge">disabled</span>{% endif %}</td>
+                        <td>{{ u.totpAuthenticationEnabled ? 'common.yes'|trans : '—' }}</td>
+                        <td>{% if not u.enabled %}<span class="badge">{{ 'common.disabled'|trans }}</span>{% endif %}</td>
                     </tr>
                 {% endfor %}
                 </tbody>
             </table>
         {% endif %}
         {% if can_create_users %}
-            <p><a class="button secondary" href="{{ path('app_admin_user_new', {domain: domain.code}) }}">New user in this domain</a></p>
+            <p><a class="button secondary" href="{{ path('app_admin_user_new', {domain: domain.code}) }}">{{ 'admin.domain.new_user_in_domain'|trans }}</a></p>
         {% endif %}
         {% if can_add_members %}
             <form method="post" action="{{ path('app_admin_domain_member', {code: domain.code}) }}">
                 <div class="row">
-                    <div class="grow"><label for="member">Move a user into this domain (username)</label><input type="text" id="member" name="username" required></div>
-                    <div><button type="submit" class="secondary">Move here</button></div>
+                    <div class="grow"><label for="member">{{ 'admin.domain.move_user_into_domain_username'|trans }}</label><input type="text" id="member" name="username" required></div>
+                    <div><button type="submit" class="secondary">{{ 'admin.domain.move_here'|trans }}</button></div>
                 </div>
                 <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_domain') }}">
             </form>
@@ -92,17 +91,17 @@
 
     {% if not rename_denial %}
         <section class="danger">
-            <h2>Delete the domain</h2>
+            <h2>{{ 'admin.domain.delete_domain'|trans }}</h2>
             {% if delete_denial %}
-                <p class="help">{{ delete_denial }}</p>
+                <p class="help">{{ delete_denial|trans }}</p>
             {% else %}
                 <form method="post" action="{{ path('app_admin_domain_delete', {code: domain.code}) }}">
                     <div class="row">
-                        <div class="grow"><label for="confirm-domain">Type the code of the domain ({{ domain.code }}) to confirm</label>
+                        <div class="grow"><label for="confirm-domain">{{ 'admin.domain.confirm_code_label'|trans({'{code}': domain.code}) }}</label>
                             <input type="text" id="confirm-domain" name="confirm" autocomplete="off" required></div>
-                        <div><button type="submit" class="danger">Delete</button></div>
+                        <div><button type="submit" class="danger">{{ 'admin.domain.delete'|trans }}</button></div>
                     </div>
-                    <p class="help">The rights granted on this domain are removed with it.</p>
+                    <p class="help">{{ 'admin.domain.rights_granted_on_domain_are'|trans }}</p>
                     <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_domain') }}">
                 </form>
             {% endif %}

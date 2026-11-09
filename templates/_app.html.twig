@@ -7,20 +7,20 @@
 
 {% block body %}
     {% set current = app.request.attributes.get('_route') %}
-    <nav class="admin" aria-label="Main">
-        <a href="{{ path('app_dashboard') }}"{% if current == 'app_dashboard' %} aria-current="page"{% endif %}>Dashboard</a>
-        <a href="{{ path('app_account') }}"{% if current == 'app_account' %} aria-current="page"{% endif %}>My profile</a>
+    <nav class="admin" aria-label="{{ 'layout.main'|trans }}">
+        <a href="{{ path('app_dashboard') }}"{% if current == 'app_dashboard' %} aria-current="page"{% endif %}>{{ 'common.dashboard'|trans }}</a>
+        <a href="{{ path('app_account') }}"{% if current == 'app_account' %} aria-current="page"{% endif %}>{{ 'common.my_profile'|trans }}</a>
         {% if can_administer() %}
-            <a href="{{ path('app_admin_users') }}"{% if current starts with 'app_admin_user' %} aria-current="page"{% endif %}>Users</a>
-            <a href="{{ path('app_admin_domains') }}"{% if current starts with 'app_admin_domain' %} aria-current="page"{% endif %}>Domains</a>
-            <a href="{{ path('app_admin_profiles') }}"{% if current starts with 'app_admin_profile' %} aria-current="page"{% endif %}>Profiles</a>
-            <a href="{{ path('app_admin_resource_types') }}"{% if current == 'app_admin_resource_types' %} aria-current="page"{% endif %}>Resource types</a>
+            <a href="{{ path('app_admin_users') }}"{% if current starts with 'app_admin_user' %} aria-current="page"{% endif %}>{{ 'common.users'|trans }}</a>
+            <a href="{{ path('app_admin_domains') }}"{% if current starts with 'app_admin_domain' %} aria-current="page"{% endif %}>{{ 'common.domains'|trans }}</a>
+            <a href="{{ path('app_admin_profiles') }}"{% if current starts with 'app_admin_profile' %} aria-current="page"{% endif %}>{{ 'common.profiles'|trans }}</a>
+            <a href="{{ path('app_admin_resource_types') }}"{% if current == 'app_admin_resource_types' %} aria-current="page"{% endif %}>{{ 'common.resource_types'|trans }}</a>
             {% if is_granted('ROLE_ADMIN') or is_granted('ROLE_SUPER_ADMIN') %}
-                <a href="{{ path('app_admin_settings') }}"{% if current starts with 'app_admin_settings' %} aria-current="page"{% endif %}>Settings</a>
+                <a href="{{ path('app_admin_settings') }}"{% if current starts with 'app_admin_settings' %} aria-current="page"{% endif %}>{{ 'common.settings'|trans }}</a>
             {% endif %}
         {% endif %}
         <span class="who">{{ app.user.username }}{% if app.user.domain %} · {{ app.user.domain.path }}{% endif %}
-            · <a href="{{ path('app_logout') }}">Sign out</a></span>
+            · <a href="{{ path('app_logout') }}">{{ 'common.sign_out'|trans }}</a></span>
     </nav>
     {{ include('_flashes.html.twig') }}
     {% block content %}{% endblock %}

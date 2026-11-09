@@ -1,37 +1,37 @@
 {% extends 'admin/_layout.html.twig' %}
 
-{% block title %}Users{% endblock %}
+{% block title %}{{ 'common.users'|trans }}{% endblock %}
 
 {% block content %}
     <div class="row" style="align-items: center">
-        <div class="grow"><h1>Users</h1></div>
-        {% if can_create %}<div style="flex: 0 0 auto"><a class="button" href="{{ path('app_admin_user_new') }}">New user</a></div>{% endif %}
+        <div class="grow"><h1>{{ 'common.users'|trans }}</h1></div>
+        {% if can_create %}<div style="flex: 0 0 auto"><a class="button" href="{{ path('app_admin_user_new') }}">{{ 'admin.new_user'|trans }}</a></div>{% endif %}
     </div>
     <form method="get">
         <div class="row">
-            <div class="grow"><label for="q">Username, e-mail or user id</label><input type="text" id="q" name="q" value="{{ query }}" autofocus></div>
-            <div><button type="submit" class="secondary">Search</button></div>
+            <div class="grow"><label for="q">{{ 'admin.users.username_e_mail_or_user'|trans }}</label><input type="text" id="q" name="q" value="{{ query }}" autofocus></div>
+            <div><button type="submit" class="secondary">{{ 'admin.users.search'|trans }}</button></div>
         </div>
     </form>
 
     <table style="margin-top: 16px">
-        <thead><tr><th>Username</th><th>E-mail</th><th>User id</th><th>Domain</th><th>Two-factor</th><th>Status</th><th>Last sign-in</th></tr></thead>
+        <thead><tr><th>{{ 'common.username'|trans }}</th><th>{{ 'common.e_mail'|trans }}</th><th>{{ 'common.user_id'|trans }}</th><th>{{ 'common.domain'|trans }}</th><th>{{ 'admin.two_factor'|trans }}</th><th>{{ 'admin.status'|trans }}</th><th>{{ 'admin.last_sign_in'|trans }}</th></tr></thead>
         <tbody>
         {% for u in users %}
             <tr>
                 <td><a href="{{ path('app_admin_user', {id: u.id}) }}">{{ u.username }}</a>
-                    {% if 'ROLE_SUPER_ADMIN' in u.roles %}<span class="badge">super-admin</span>{% elseif 'ROLE_ADMIN' in u.roles %}<span class="badge">admin</span>{% endif %}</td>
+                    {% if 'ROLE_SUPER_ADMIN' in u.roles %}<span class="badge">{{ 'admin.super_admin'|trans }}</span>{% elseif 'ROLE_ADMIN' in u.roles %}<span class="badge">{{ 'admin.admin'|trans }}</span>{% endif %}</td>
                 <td>{{ u.email ?? '—' }}</td>
                 <td class="expr">{{ u.externalUserId }}</td>
                 <td class="expr">{{ u.domain ? u.domain.path : '—' }}</td>
-                <td>{% if u.totpEnabledAt %}<span class="badge ok">on</span>{% else %}<span class="badge warn">off</span>{% endif %}</td>
-                <td>{% if not u.enabled %}<span class="badge warn">disabled</span>{% elseif u.isLocked(now) %}<span class="badge warn">locked</span>{% else %}active{% endif %}</td>
-                <td>{{ u.lastLoginAt ? u.lastLoginAt|date('Y-m-d H:i') : '—' }}</td>
+                <td>{% if u.totpEnabledAt %}<span class="badge ok">{{ 'admin.users.on'|trans }}</span>{% else %}<span class="badge warn">{{ 'admin.users.off'|trans }}</span>{% endif %}</td>
+                <td>{% if not u.enabled %}<span class="badge warn">{{ 'common.disabled'|trans }}</span>{% elseif u.isLocked(now) %}<span class="badge warn">{{ 'admin.locked'|trans }}</span>{% else %}{{ 'admin.active'|trans }}{% endif %}</td>
+                <td>{{ u.lastLoginAt ? u.lastLoginAt|locale_date('datetime') : '—' }}</td>
             </tr>
         {% else %}
-            <tr><td colspan="7" class="muted">No user found.</td></tr>
+            <tr><td colspan="7" class="muted">{{ 'admin.users.no_user_found'|trans }}</td></tr>
         {% endfor %}
         </tbody>
     </table>
-    {% if users|length == 100 %}<p class="help">First 100 results: refine the search.</p>{% endif %}
+    {% if users|length == 100 %}<p class="help">{{ 'admin.users.first_100_results_refine_search'|trans }}</p>{% endif %}
 {% endblock %}

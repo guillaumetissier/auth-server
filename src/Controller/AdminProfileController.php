@@ -10,6 +10,7 @@ use App\Entity\AccessGrant;
 use App\Entity\AccessProfile;
 use App\Entity\ResourceType;
 use App\Entity\User;
+use App\I18n\Text;
 use Doctrine\ORM\EntityManagerInterface;
 use GuillaumeTissier\ResourceGuard\Access\AccessExpression;
 use GuillaumeTissier\ResourceGuard\Access\InvalidAccessExpression;
@@ -25,7 +26,7 @@ use Symfony\Component\Routing\Attribute\Route;
  * of a profile given to users first shows whose rights change, and how; saving needs a confirmation.
  *
  * @phpstan-type Values array{code: string, name: string, rights: string, description: string}
- * @phpstan-type Dialog array{mode: 'create'|'edit', values: Values, impact: list<array{grant: AccessGrant, before: AccessExpression, after: AccessExpression}>, error: ?string}
+ * @phpstan-type Dialog array{mode: 'create'|'edit', values: Values, impact: list<array{grant: AccessGrant, before: AccessExpression, after: AccessExpression}>, error: \Symfony\Contracts\Translation\TranslatableInterface|string|null}
  */
 #[Route('/admin/profiles')]
 final class AdminProfileController extends AbstractAdminController
@@ -51,11 +52,11 @@ final class AdminProfileController extends AbstractAdminController
         try {
             $profile = $this->profiles->save($values['code'], $values['name'], AccessExpression::parse($values['rights']), $values['description'], $actor, true);
             $this->em->flush();
-            $this->addFlash('success', \sprintf('Profile "%s" created. Give it to users from their page (Rights).', $profile->getName()));
+            $this->addFlash('success', new Text('admin.profile.profile_name_created_give_it', ['{name}' => $profile->getName()]));
 
             return $this->redirectToRoute('app_admin_profiles');
         } catch (\InvalidArgumentException|InvalidAccessExpression $e) {
-            return $this->listPage(['mode' => 'create', 'values' => $values, 'impact' => [], 'error' => $e->getMessage()]);
+            return $this->listPage(['mode' => 'create', 'values' => $values, 'impact' => [], 'error' => Text::of($e)]);
         }
     }
 
@@ -86,8 +87,8 @@ final class AdminProfileController extends AbstractAdminController
                 $this->profiles->save($profile->getCode(), $values['name'], $expression, $values['description'], $actor, false);
                 $this->em->flush();
                 $this->addFlash('success', [] === $impact
-                    ? \sprintf('Profile "%s" saved.', $values['name'])
-                    : \sprintf('Profile "%s" saved: the rights of %d grant(s) changed, from the next token of each user.', $values['name'], \count($impact)));
+                    ? new Text('admin.profile.profile_name_saved', ['{name}' => $values['name']])
+                    : new Text('admin.profile.profile_name_saved_rights_count', ['{name}' => $values['name'], '{count}' => \count($impact)]));
 
                 return $fromDetail
                     ? $this->redirectToRoute('app_admin_profile', ['code' => $profile->getCode()])
@@ -96,7 +97,7 @@ final class AdminProfileController extends AbstractAdminController
             $values['rights'] = $expression->toString();
             $dialog = ['mode' => 'edit', 'values' => $values, 'impact' => $impact, 'error' => null];
         } catch (\InvalidArgumentException|InvalidAccessExpression $e) {
-            $dialog = ['mode' => 'edit', 'values' => $values, 'impact' => [], 'error' => $e->getMessage()];
+            $dialog = ['mode' => 'edit', 'values' => $values, 'impact' => [], 'error' => Text::of($e)];
         }
 
         return $fromDetail ? $this->detailPage($profile, $dialog) : $this->listPage($dialog);
@@ -114,9 +115,9 @@ final class AdminProfileController extends AbstractAdminController
         try {
             $this->profiles->remove($profile, $actor);
             $this->em->flush();
-            $this->addFlash('success', \sprintf('Profile "%s" removed.', $profile->getName()));
+            $this->addFlash('success', new Text('admin.profile.profile_name_removed', ['{name}' => $profile->getName()]));
         } catch (\DomainException $e) {
-            $this->addFlash('error', $e->getMessage());
+            $this->addFlash('error', Text::of($e));
         }
 
         return $this->redirectToRoute('app_admin_profiles');

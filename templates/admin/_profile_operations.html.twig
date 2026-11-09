@@ -1,8 +1,8 @@
 {# Edit (dialog) and Remove (confirmation) buttons of a profile; "used": number of grants that have it. #}
 <button type="button" class="small secondary" data-open-profile="edit" data-code="{{ p.code }}" data-name="{{ p.name }}"
-        data-rights="{{ p.expression }}" data-description="{{ p.description }}">Edit</button>
+        data-rights="{{ p.expression }}" data-description="{{ p.description }}">{{ 'admin.edit'|trans }}</button>
 <form method="post" action="{{ path('app_admin_profile_delete', {code: p.code}) }}" class="inline"
-      data-confirm-title="Remove the profile {{ p.name }}?" data-confirm-text="Nobody has it any more. It can be created again later with the same code.">
+      data-confirm-title="{{ 'admin.profile_operations.remove_profile_name'|trans({'{name}': p.name}) }}" data-confirm-text="{{ 'admin.profile_operations.nobody_has_it_any_more'|trans }}">
     <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_profile') }}">
-    <button type="submit" class="small danger" {{ used > 0 ? 'disabled title="Change the rights of the users who have it first"' }}>Remove</button>
+    <button type="submit" class="small danger"{% if used > 0 %} disabled title="{{ 'admin.profile_operations.change_rights_users_who_have'|trans }}"{% endif %}>{{ 'admin.remove'|trans }}</button>
 </form>

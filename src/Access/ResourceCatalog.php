@@ -10,6 +10,9 @@ use App\Entity\Domain;
 use App\Entity\ResourceFacet;
 use App\Entity\ResourceType;
 use App\Entity\User;
+use App\I18n\InvalidInput;
+use App\I18n\Refusal;
+use App\I18n\Text;
 use Doctrine\ORM\EntityManagerInterface;
 use GuillaumeTissier\ResourceGuard\Access\AccessExpression;
 use Psr\Log\LoggerInterface;
@@ -57,9 +60,9 @@ final readonly class ResourceCatalog
     }
 
     /**
-     * @return string|null an error naming the undeclared types and facets, null when all are known
+     * @return Text|null an error naming the undeclared types and facets, null when all are known
      */
-    public function unknownTypes(AccessExpression $expression): ?string
+    public function unknownTypes(AccessExpression $expression): ?Text
     {
         $known = $this->knownCodes();
         $unknown = array_filter(
@@ -67,7 +70,7 @@ final readonly class ResourceCatalog
             static fn (string $t): bool => !isset($known[$t]) && !\array_key_exists($t, ResourceType::RESERVED),
         );
 
-        return [] === $unknown ? null : \sprintf('Unknown resource type(s) or facet(s): %s. Declare them first.', implode(', ', $unknown));
+        return [] === $unknown ? null : new Text('access.catalog.unknown_resource_type_s_or', ['{codes}' => implode(', ', $unknown)]);
     }
 
     /**
@@ -81,7 +84,7 @@ final readonly class ResourceCatalog
         $code = strtolower(trim($code));
         $label = '' === trim($label) ? $code : trim($label);
         if (AccessExpression::isReserved($code)) {
-            throw new \InvalidArgumentException(\sprintf('"%s" is a built-in type: it cannot be declared, nor have facets.', $code));
+            throw new InvalidInput('access.catalog.code_is_built_in_type', ['{code}' => $code]);
         }
 
         $parent = AccessExpression::parentType($code);
@@ -100,7 +103,7 @@ final readonly class ResourceCatalog
         }
 
         $type = $this->em->find(ResourceType::class, $parent)
-            ?? throw new \InvalidArgumentException(\sprintf('Unknown resource type "%s": declare it before its facets.', $parent));
+            ?? throw new InvalidInput('access.catalog.unknown_resource_type_code_declare', ['{code}' => $parent]);
         $facet = $this->em->find(ResourceFacet::class, $code);
         if (null === $facet) {
             $facet = new ResourceFacet($type, substr($code, \strlen($parent) + 1), $label, $description);
@@ -126,16 +129,16 @@ final readonly class ResourceCatalog
             ? $this->em->find(ResourceType::class, $code)
             : $this->em->find(ResourceFacet::class, $code);
         if (null === $entity) {
-            throw new \InvalidArgumentException(\sprintf('Unknown resource type or facet "%s".', $code));
+            throw new InvalidInput('common.unknown_resource_type_or_facet', ['{code}' => $code]);
         }
 
         if ($entity instanceof ResourceType && [] !== $entity->getFacets()) {
-            throw new \DomainException(\sprintf('"%s" still has facets (%s): remove them first.', $code, implode(', ', array_map(static fn (ResourceFacet $f): string => $f->getCode(), $entity->getFacets()))));
+            throw new Refusal('access.catalog.code_still_has_facets_facets', ['{code}' => $code, '{facets}' => implode(', ', array_map(static fn (ResourceFacet $f): string => $f->getCode(), $entity->getFacets()))]);
         }
         $usages = $this->usages($code);
         if ([] !== $usages) {
             $shown = \array_slice($usages, 0, 5);
-            throw new \DomainException(\sprintf('"%s" is still used in %d place(s): %s%s. Change these rights first.', $code, \count($usages), implode('; ', $shown), \count($usages) > \count($shown) ? '…' : ''));
+            throw new Refusal('access.catalog.code_is_still_used_in', ['{code}' => $code, '{count}' => \count($usages), '{places}' => $shown, '{more}' => \count($usages) > \count($shown) ? '…' : '']);
         }
 
         if ($entity instanceof ResourceFacet) {
@@ -149,7 +152,7 @@ final readonly class ResourceCatalog
      * Where a type (or one of its facets) or a facet is named: rights of users, profiles, owner rights of
      * domains, and ACCESS_DEFAULT_EXPRESSION.
      *
-     * @return list<string>
+     * @return list<Text>
      */
     public function usages(string $code): array
     {
@@ -191,7 +194,7 @@ final readonly class ResourceCatalog
     /**
      * Every stored expression, with a description of where it is.
      *
-     * @return iterable<array{string, AccessExpression}>
+     * @return iterable<array{Text, AccessExpression}>
      */
     private function expressions(): iterable
     {
@@ -199,15 +202,15 @@ final readonly class ResourceCatalog
         $grants = $this->em->createQuery('SELECT g, u, d FROM '.AccessGrant::class.' g JOIN g.user u JOIN g.domain d')->getResult();
         foreach ($grants as $grant) {
             // Its own rules only: what comes from a profile is reported once, for the profile.
-            yield [\sprintf('rights of %s on %s', $grant->getUser()->getUsername(), $grant->getDomain()->getPath()), $grant->getAdjustments()];
+            yield [new Text('access.catalog.rights_username_on_domain', ['{username}' => $grant->getUser()->getUsername(), '{domain}' => $grant->getDomain()->getPath()]), $grant->getAdjustments()];
         }
         foreach ($this->em->getRepository(AccessProfile::class)->findAll() as $profile) {
-            yield [\sprintf('profile %s', $profile->getCode()), $profile->getExpression()];
+            yield [new Text('access.catalog.profile_code', ['{code}' => $profile->getCode()]), $profile->getExpression()];
         }
         foreach ($this->em->getRepository(Domain::class)->findAll() as $domain) {
-            yield [\sprintf('owner rights of domain %s', $domain->getCode()), $domain->getOwnerExpression()];
+            yield [new Text('access.catalog.owner_rights_domain_code', ['{code}' => $domain->getCode()]), $domain->getOwnerExpression()];
         }
-        yield ['ACCESS_DEFAULT_EXPRESSION', $this->resolver->defaultExpression()];
+        yield [new Text('access.catalog.access_default_expression'), $this->resolver->defaultExpression()];
     }
 
     private static function names(AccessExpression $expression, string $code): bool

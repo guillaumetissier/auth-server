@@ -26,6 +26,24 @@ final class AccountControllerTest extends OAuthTestCase
         self::assertSelectorExists('a[href="/account/2fa/setup"]');
     }
 
+    public function testTheLanguageIsSavedOnTheAccount(): void
+    {
+        $this->createUser(withTotp: false);
+        $this->submitLogin();
+        $this->browser->request('GET', '/account');
+
+        $this->browser->submitForm('Save the language', ['locale' => 'fr']);
+        $this->browser->followRedirect();
+        self::assertSelectorTextContains('.alert.ok', 'Langue enregistrée.');
+        self::assertSelectorTextContains('h1', 'Mon profil');
+        $this->em()->clear();
+        self::assertSame('fr', $this->userNamed('alice')->getLocale());
+
+        $this->browser->submitForm('Enregistrer la langue', ['locale' => '']);
+        $this->em()->clear();
+        self::assertNull($this->userNamed('alice')->getLocale(), 'back to the language of the browser');
+    }
+
     public function testEmailChangeNeedsTheCurrentPassword(): void
     {
         $this->createUser(withTotp: false);

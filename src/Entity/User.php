@@ -52,6 +52,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, Equatab
     #[ORM\Column(length: 180, unique: true, nullable: true)]
     private ?string $email = null;
 
+    /** Language of the interface and of the e-mails sent to the user ("fr"), null for the browser's. */
+    #[ORM\Column(length: 5, nullable: true)]
+    private ?string $locale = null;
+
     /** SHA-256 of the pending password link (reset or invitation), never the link itself. */
     #[ORM\Column(name: 'password_link_hash', length: 64, unique: true, nullable: true)]
     private ?string $passwordLinkHash = null;
@@ -150,6 +154,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, Equatab
     public function setEmail(?string $email): void
     {
         $this->email = null === $email || '' === $email ? null : mb_strtolower($email);
+    }
+
+    public function getLocale(): ?string
+    {
+        return $this->locale;
+    }
+
+    public function setLocale(?string $locale): void
+    {
+        $this->locale = null === $locale || '' === $locale ? null : $locale;
     }
 
     /**

@@ -3,165 +3,168 @@
 {% block title %}{{ target.username }}{% endblock %}
 
 {% block content %}
-    <p class="muted"><a href="{{ path('app_admin_users') }}">Users</a> /</p>
+    <p class="muted"><a href="{{ path('app_admin_users') }}">{{ 'common.users'|trans }}</a> /</p>
     <h1>{{ target.username }}
-        {% if 'ROLE_SUPER_ADMIN' in target.roles %}<span class="badge">super-admin</span>{% elseif 'ROLE_ADMIN' in target.roles %}<span class="badge">admin</span>{% endif %}
-        {% if not target.enabled %}<span class="badge warn">disabled</span>{% elseif target.isLocked(now) %}<span class="badge warn">locked</span>{% endif %}
+        {% if 'ROLE_SUPER_ADMIN' in target.roles %}<span class="badge">{{ 'admin.super_admin'|trans }}</span>{% elseif 'ROLE_ADMIN' in target.roles %}<span class="badge">{{ 'admin.admin'|trans }}</span>{% endif %}
+        {% if not target.enabled %}<span class="badge warn">{{ 'common.disabled'|trans }}</span>{% elseif target.isLocked(now) %}<span class="badge warn">{{ 'admin.locked'|trans }}</span>{% endif %}
     </h1>
 
-    <h2>Account</h2>
+    <h2>{{ 'common.account'|trans }}</h2>
     <dl>
-        <dt>User id</dt><dd class="expr">{{ target.externalUserId }}</dd>
-        <dt>E-mail</dt><dd>{{ target.email ?? '—' }}</dd>
-        <dt>Domain</dt><dd>{% if target.domain %}<a href="{{ path('app_admin_domain', {code: target.domain.code}) }}" class="expr">{{ target.domain.path }}</a>{% else %}—{% endif %}</dd>
-        <dt>Two-factor</dt><dd>{% if target.totpEnabledAt %}<span class="badge ok">enabled</span> since {{ target.totpEnabledAt|date('Y-m-d') }}{% else %}<span class="badge warn">not enabled</span>{% if target.twoFactorPostponeCount > 0 %} · postponed {{ target.twoFactorPostponeCount }} time(s){% endif %}{% endif %}</dd>
-        <dt>Status</dt><dd>{% if not target.enabled %}disabled{% elseif target.isLocked(now) %}locked until {{ target.lockedUntil|date('H:i') }} (too many failed sign-ins){% else %}active{% endif %}</dd>
-        <dt>Last sign-in</dt><dd>{{ target.lastLoginAt ? target.lastLoginAt|date('Y-m-d H:i') : 'never' }}</dd>
-        <dt>Created</dt><dd>{{ target.createdAt|date('Y-m-d') }}</dd>
-        {% if target.passwordLinkExpiresAt and target.passwordLinkExpiresAt > now %}<dt>Password link</dt><dd>pending, valid until {{ target.passwordLinkExpiresAt|date('Y-m-d H:i') }}</dd>{% endif %}
+        <dt>{{ 'common.user_id'|trans }}</dt><dd class="expr">{{ target.externalUserId }}</dd>
+        <dt>{{ 'common.e_mail'|trans }}</dt><dd>{{ target.email ?? '—' }}</dd>
+        <dt>{{ 'common.language'|trans }}</dt><dd>{{ target.locale ? app_locales()[target.locale] ?? target.locale : 'admin.user.same_as_browser'|trans }}</dd>
+        <dt>{{ 'common.domain'|trans }}</dt><dd>{% if target.domain %}<a href="{{ path('app_admin_domain', {code: target.domain.code}) }}" class="expr">{{ target.domain.path }}</a>{% else %}—{% endif %}</dd>
+        <dt>{{ 'admin.two_factor'|trans }}</dt><dd>{% if target.totpEnabledAt %}<span class="badge ok">{{ 'common.enabled'|trans }}</span> {{ 'admin.user.since_date'|trans({'{date}': target.totpEnabledAt|locale_date}) }}{% else %}<span class="badge warn">{{ 'common.not_enabled'|trans }}</span>{% if target.twoFactorPostponeCount > 0 %} · {{ 'admin.user.postponed_count'|trans({'{count}': target.twoFactorPostponeCount}) }}{% endif %}{% endif %}</dd>
+        <dt>{{ 'admin.status'|trans }}</dt><dd>{% if not target.enabled %}{{ 'common.disabled'|trans }}{% elseif target.isLocked(now) %}{{ 'admin.user.locked_until_time_too_many'|trans({'{time}': target.lockedUntil|locale_date('time')}) }}{% else %}{{ 'admin.active'|trans }}{% endif %}</dd>
+        <dt>{{ 'admin.last_sign_in'|trans }}</dt><dd>{{ target.lastLoginAt ? target.lastLoginAt|locale_date('datetime') : 'admin.user.never'|trans }}</dd>
+        <dt>{{ 'common.created'|trans }}</dt><dd>{{ target.createdAt|locale_date }}</dd>
+        {% if target.passwordLinkExpiresAt and target.passwordLinkExpiresAt > now %}<dt>{{ 'admin.user.password_link'|trans }}</dt><dd>{{ 'admin.user.pending_valid_until_date'|trans({'{date}': target.passwordLinkExpiresAt|locale_date('datetime')}) }}</dd>{% endif %}
     </dl>
 
     {% if account_denial %}
-        <p class="help">{{ account_denial }}</p>
+        <p class="help">{{ account_denial|trans }}</p>
     {% else %}
         <div class="actions toolbar">
-            <button type="button" class="secondary" data-dialog="identity-dialog">Edit</button>
+            <button type="button" class="secondary" data-dialog="identity-dialog">{{ 'admin.edit'|trans }}</button>
             <form method="post" action="{{ path('app_admin_user_password_link', {id: target.id}) }}" class="inline"
-                  data-confirm-title="Send a password link to {{ target.username }}?" data-confirm-button="Send" data-confirm-danger="0"
-                  data-confirm-text="E-mails {{ target.email }} a link to choose a new password. Nobody else ever sees the password.">
+                  data-confirm-title="{{ 'admin.user.send_password_link_to_username'|trans({'{username}': target.username}) }}" data-confirm-button="{{ 'admin.user.send'|trans }}" data-confirm-danger="0"
+                  data-confirm-text="{{ 'admin.user.e_mails_email_link_to'|trans({'{email}': target.email ?? ''}) }}">
                 <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user') }}">
-                <button type="submit" class="secondary" {{ target.email and target.enabled ? '' : 'disabled title="' ~ (target.email ? 'The account is disabled' : 'Add an e-mail address first') ~ '"' }}>Send a password link</button>
+                <button type="submit" class="secondary"{% if not target.email %} disabled title="{{ 'admin.user.add_e_mail_address_first'|trans }}"{% elseif not target.enabled %} disabled title="{{ 'admin.user.account_is_disabled'|trans }}"{% endif %}>{{ 'admin.user.send_password_link'|trans }}</button>
             </form>
             <form method="post" action="{{ path('app_admin_user_2fa_reset', {id: target.id}) }}" class="inline"
-                  data-confirm-title="Reset the two-factor authentication of {{ target.username }}?" data-confirm-button="Reset"
-                  data-confirm-text="For a lost phone: the user sets it up again at his next sign-in. Check who is asking first: whoever resets it can take over the account with the password.">
+                  data-confirm-title="{{ 'admin.user.reset_two_factor_authentication_username'|trans({'{username}': target.username}) }}" data-confirm-button="{{ 'admin.user.reset'|trans }}"
+                  data-confirm-text="{{ 'admin.user.for_lost_phone_user_sets'|trans }}">
                 <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user') }}">
-                <button type="submit" class="secondary" {{ target.totpEnabledAt ? '' : 'disabled title="Two-factor authentication is not enabled"' }}>Reset 2FA</button>
+                <button type="submit" class="secondary"{% if not target.totpEnabledAt %} disabled title="{{ 'admin.user.two_factor_authentication_is_not'|trans }}"{% endif %}>{{ 'admin.user.reset_2fa'|trans }}</button>
             </form>
         </div>
 
         <dialog id="identity-dialog" class="modal" aria-labelledby="identity-dialog-title">
             <form method="post" action="{{ path('app_admin_user_identity', {id: target.id}) }}">
-                <h2 id="identity-dialog-title">Edit {{ target.username }}</h2>
-                <label for="a-username">Username</label>
+                <h2 id="identity-dialog-title">{{ 'admin.user.edit_username'|trans({'{username}': target.username}) }}</h2>
+                <label for="a-username">{{ 'common.username'|trans }}</label>
                 <input type="text" id="a-username" name="username" value="{{ target.username }}" required>
-                <label for="a-email">E-mail address</label>
+                <label for="a-email">{{ 'common.e_mail_address'|trans }}</label>
                 <input type="email" id="a-email" name="email" value="{{ target.email }}">
                 <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user') }}">
                 <div class="actions">
-                    <button type="submit">Save</button>
-                    <button type="button" class="secondary" data-close-dialog>Cancel</button>
+                    <button type="submit">{{ 'admin.save'|trans }}</button>
+                    <button type="button" class="secondary" data-close-dialog>{{ 'common.cancel'|trans }}</button>
                 </div>
             </form>
         </dialog>
     {% endif %}
 
     {% if impersonation_mode %}
-        <h2>Impersonate</h2>
+        <hr class="section">
+        <h2>{{ 'admin.user.impersonate'|trans }}</h2>
         {% if impersonation_entry_points is empty %}
-            <p class="help">No application has an impersonation entry point yet
+            <p class="help">{{ 'admin.user.no_application_has_impersonation_entry'|trans }}
                 (<code>app:client:policy &lt;client&gt; --impersonation-uri="https://…/impersonate?user={user}"</code>).</p>
         {% else %}
-            <p class="help">Opens the application, which asks you for a reason and a fresh authentication code, then signs you in as
-                {{ target.username }} — {{ impersonation_mode == 'full' ? 'with full rights' : 'read-only' }}.</p>
+            <p class="help">{{ (impersonation_mode == 'full'
+                ? 'admin.user.impersonate_help_full'
+                : 'admin.user.impersonate_help_read_only')|trans({'{username}': target.username}) }}</p>
             {% for e in impersonation_entry_points %}
-                <a class="button" href="{{ e.uri }}" rel="noopener">Impersonate in {{ e.name }}</a>
+                <a class="button" href="{{ e.uri }}" rel="noopener">{{ 'admin.user.impersonate_in_application'|trans({'{application}': e.name}) }}</a>
             {% endfor %}
         {% endif %}
     {% endif %}
 
-    <h2>Rights</h2>
+    <hr class="section">
+    <h2>{{ 'common.rights'|trans }}</h2>
     <table>
-        <thead><tr><th>Domain</th><th>Subdomains</th><th>Rights</th><th>Origin</th><th></th></tr></thead>
+        <thead><tr><th>{{ 'common.domain'|trans }}</th><th>{{ 'common.subdomains'|trans }}</th><th>{{ 'common.rights'|trans }}</th><th>{{ 'admin.user.origin'|trans }}</th><th></th></tr></thead>
         <tbody>
         {% for g in grants %}
             <tr>
                 <td class="expr">{{ g.domain.path }}</td>
-                <td>{{ g.includesSubdomains ? 'yes' : 'no' }}</td>
+                <td>{{ (g.includesSubdomains ? 'common.yes' : 'common.no')|trans }}</td>
                 <td>{% if g.profile %}
                         <a href="{{ path('app_admin_profile', {code: g.profile.code}) }}" class="badge">{{ g.profile.name }}</a>
-                        {% if not g.adjustments.isEmpty %}<span class="muted">adjusted:</span> <span class="expr">{{ g.adjustments }}</span>{% endif %}
+                        {% if not g.adjustments.isEmpty %}<span class="muted">{{ 'admin.user.adjusted'|trans }}</span> <span class="expr">{{ g.adjustments }}</span>{% endif %}
                         <div class="expr muted">= {{ g.expression }}</div>
                     {% else %}<span class="expr">{{ g.expression }}</span>{% endif %}</td>
-                <td class="muted">granted{% if g.grantedBy %} by {{ g.grantedBy.username }}{% endif %}, {{ g.updatedAt|date('Y-m-d') }}</td>
+                <td class="muted">{{ (g.grantedBy ? 'admin.user.granted_by_username_date' : 'admin.user.granted_date')|trans({'{username}': g.grantedBy ? g.grantedBy.username : '', '{date}': g.updatedAt|locale_date}) }}</td>
                 <td class="num nowrap">{% if not change_denial %}
                     {% if g.domain.code in grantable_domains|map(d => d.code) %}
                         <button type="button" class="small secondary" data-dialog="grant-dialog"
-                                data-fields="{{ {domain: g.domain.code, profile: g.profile ? g.profile.code : '', rights: g.profile ? g.adjustments.toString : g.expression.toString, subdomains: g.includesSubdomains}|json_encode }}">Edit</button>
+                                data-fields="{{ {domain: g.domain.code, profile: g.profile ? g.profile.code : '', rights: g.profile ? g.adjustments.toString : g.expression.toString, subdomains: g.includesSubdomains}|json_encode }}">{{ 'admin.edit'|trans }}</button>
                     {% endif %}
                     <form method="post" action="{{ path('app_admin_user_revoke', {id: target.id, grant: g.id}) }}" class="inline"
-                          data-confirm-title="Remove the rights of {{ target.username }} on {{ g.domain.path }}?"
-                          data-confirm-text="{{ g.expression.isEmpty ? '' : 'He loses: ' ~ g.expression ~ '. It applies from his next token.' }}">
+                          data-confirm-title="{{ 'admin.user.remove_rights_username_on_domain'|trans({'{username}': target.username, '{domain}': g.domain.path}) }}"
+                          data-confirm-text="{{ g.expression.isEmpty ? '' : 'admin.user.he_loses_rights_it_applies'|trans({'{rights}': g.expression.toString}) }}">
                         <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user') }}">
-                        <button type="submit" class="small danger">Remove</button>
+                        <button type="submit" class="small danger">{{ 'admin.remove'|trans }}</button>
                     </form>
                 {% endif %}</td>
             </tr>
         {% endfor %}
         {% for d in owned %}
-            <tr><td class="expr">{{ d.path }}</td><td>yes</td><td class="expr">{{ d.ownerExpression }}</td><td class="muted">owner of {{ d.code }}</td><td></td></tr>
+            <tr><td class="expr">{{ d.path }}</td><td>{{ 'common.yes'|trans }}</td><td class="expr">{{ d.ownerExpression }}</td><td class="muted">{{ 'admin.user.owner_domain'|trans({'{domain}': d.code}) }}</td><td></td></tr>
         {% endfor %}
         {% if target.domain and default_expression %}
-            <tr><td class="expr">{{ target.domain.path }}</td><td>yes</td><td class="expr">{{ default_expression }}</td><td class="muted">default for everyone</td><td></td></tr>
+            <tr><td class="expr">{{ target.domain.path }}</td><td>{{ 'common.yes'|trans }}</td><td class="expr">{{ default_expression }}</td><td class="muted">{{ 'admin.user.default_for_everyone'|trans }}</td><td></td></tr>
         {% endif %}
         {% if grants is empty and owned is empty and (not target.domain or not default_expression) %}
-            <tr><td colspan="5" class="muted">No rights.</td></tr>
+            <tr><td colspan="5" class="muted">{{ 'admin.user.no_rights'|trans }}</td></tr>
         {% endif %}
         </tbody>
     </table>
 
     {% if change_denial %}
-        <p class="help">{{ change_denial }}</p>
+        <p class="help">{{ change_denial|trans }}</p>
     {% elseif grantable_domains is not empty %}
-        <div class="actions toolbar"><button type="button" data-dialog="grant-dialog">Add</button></div>
+        <div class="actions toolbar"><button type="button" data-dialog="grant-dialog">{{ 'admin.user.add'|trans }}</button></div>
 
         <dialog id="grant-dialog" class="modal modal-wide" aria-labelledby="grant-dialog-title">
             <form method="post" action="{{ path('app_admin_user_grant', {id: target.id}) }}">
-                <h2 id="grant-dialog-title">Grant or replace rights</h2>
-                <p class="help">One grant per domain: saving on a domain where {{ target.username }} already has rights replaces them.</p>
+                <h2 id="grant-dialog-title">{{ 'admin.user.grant_or_replace_rights'|trans }}</h2>
+                <p class="help">{{ 'admin.user.one_grant_per_domain_saving'|trans({'{username}': target.username}) }}</p>
                 <div class="row">
-                    <div class="grow"><label for="g-domain">Domain</label>
+                    <div class="grow"><label for="g-domain">{{ 'common.domain'|trans }}</label>
                         <select id="g-domain" name="domain">
                             {% for d in grantable_domains %}<option value="{{ d.code }}">{{ d.path }}</option>{% endfor %}
                         </select></div>
                     {% if profiles is not empty %}
-                        <div class="grow"><label for="g-profile">Profile</label>
+                        <div class="grow"><label for="g-profile">{{ 'admin.profile_label'|trans }}</label>
                             <select id="g-profile" name="profile">
-                                <option value="">None</option>
+                                <option value="">{{ 'admin.user.none'|trans }}</option>
                                 {% for p in profiles %}<option value="{{ p.code }}" title="{{ p.expression }}">{{ p.name }} ({{ p.expression }})</option>{% endfor %}
                             </select></div>
                     {% endif %}
                 </div>
-                <label for="g-rights">{{ profiles is not empty ? 'Rights, or adjustments of the profile' : 'Rights' }}</label>
+                <label for="g-rights">{{ (profiles is not empty ? 'admin.user.rights_or_adjustments_profile' : 'common.rights')|trans }}</label>
                 <input type="text" id="g-rights" name="rights" class="expr" {{ profiles is empty ? 'required' }} placeholder="*:r vehicle:w user:w:own">
                 {% if profiles is not empty %}
-                    <p class="help">With a <a href="{{ path('app_admin_profiles') }}">profile</a>, this field adjusts it: each rule replaces the profile's rule for the
-                        same type, the others are added (<code>invoice:-</code>: the profile without invoices; <code>tire:r</code>: the profile and tires).
-                        The user stays linked to the profile and follows its changes.</p>
+                    <p class="help">{{ 'admin.user.with_profile_field_adjusts_it'|trans({'{url}': path('app_admin_profiles')})|raw }}</p>
                 {% endif %}
-                <p class="help">Types: {% for t in resource_types %}<code>{{ t.code }}</code> {% for f in t.facets %}<code title="{{ f.description ?? f.label }}">{{ f.code }}</code> {% endfor %}{% endfor %}{% for code, label in reserved_types %}<code title="{{ label }}">{{ code }}</code> {% endfor %}
-                    · <a href="{{ path('app_admin_resource_types') }}">syntax</a>. You can never grant more than you hold yourself.</p>
-                <label class="check"><input type="checkbox" name="subdomains" value="1" checked> Also on its subdomains</label>
+                <p class="help">{{ 'admin.types'|trans }} {% for t in resource_types %}<code>{{ t.code }}</code> {% for f in t.facets %}<code title="{{ f.description ?? f.label }}">{{ f.code }}</code> {% endfor %}{% endfor %}{% for code, label in reserved_types %}<code title="{{ ('resource_type.reserved.' ~ code|slice(1))|trans }}">{{ code }}</code> {% endfor %}
+                    · <a href="{{ path('app_admin_resource_types') }}">{{ 'admin.syntax'|trans }}</a>. {{ 'admin.user.you_can_never_grant_more'|trans }}</p>
+                <label class="check"><input type="checkbox" name="subdomains" value="1" checked> {{ 'admin.user.also_on_subdomains'|trans }}</label>
                 <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user') }}">
                 <div class="actions">
-                    <button type="submit">Save</button>
-                    <button type="button" class="secondary" data-close-dialog>Cancel</button>
+                    <button type="submit">{{ 'admin.save'|trans }}</button>
+                    <button type="button" class="secondary" data-close-dialog>{{ 'common.cancel'|trans }}</button>
                 </div>
             </form>
         </dialog>
     {% endif %}
 
     {% if preview_domain %}
-        <h2>What it gives</h2>
+        <hr class="section">
+        <h2>{{ 'admin.user.what_it_gives'|trans }}</h2>
         <form method="get" class="row">
-            <div class="grow"><label for="p-domain">On domain</label>
+            <div class="grow"><label for="p-domain">{{ 'admin.user.on_domain'|trans }}</label>
                 <select id="p-domain" name="preview">
                     {% for d in preview_domains %}<option value="{{ d.code }}" {{ d.id == preview_domain.id ? 'selected' }}>{{ d.path }}</option>{% endfor %}
                 </select></div>
-            <div><button type="submit" class="secondary">Show</button></div>
+            <div><button type="submit" class="secondary">{{ 'admin.user.show'|trans }}</button></div>
         </form>
         <table style="margin-top: 12px">
-            <thead><tr><th>Type</th><th>Any resource</th><th>Own resources</th></tr></thead>
+            <thead><tr><th>{{ 'admin.type'|trans }}</th><th>{{ 'admin.user.any_resource'|trans }}</th><th>{{ 'admin.user.own_resources'|trans }}</th></tr></thead>
             <tbody>
             {% for r in preview %}
                 <tr{% if r.facet %} class="facet"{% endif %}>
@@ -172,39 +175,41 @@
             {% endfor %}
             </tbody>
         </table>
-        <p class="help">As resource servers compute it from the access token. Changes apply from the user's next token (refresh).</p>
+        <p class="help">{{ 'admin.user.as_resource_servers_compute_it'|trans }}</p>
     {% endif %}
 
     {% if can_change_roles %}
-        <h2>Platform role</h2>
+        <hr class="section">
+        <h2>{{ 'admin.user.platform_role'|trans }}</h2>
         <form method="post" action="{{ path('app_admin_user_roles', {id: target.id}) }}">
             <label class="check"><input type="checkbox" name="admin" value="1" {{ 'ROLE_ADMIN' in target.roles ? 'checked' }}>
-                Platform administrator (sees every domain, impersonates read-only, changes nothing)</label>
+                {{ 'admin.user.platform_administrator_sees_every_domain'|trans }}</label>
             <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user') }}">
-            <button type="submit" class="secondary">Save</button>
+            <button type="submit" class="secondary">{{ 'admin.save'|trans }}</button>
         </form>
     {% endif %}
 
     {% if not account_denial %}
+        <hr class="section">
         <section class="danger">
-            <h2>Status and deletion</h2>
+            <h2>{{ 'admin.user.status_and_deletion'|trans }}</h2>
             <form method="post" action="{{ path('app_admin_user_status', {id: target.id}) }}">
                 <input type="hidden" name="enabled" value="{{ target.enabled ? 0 : 1 }}">
                 <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user') }}">
                 {% if target.enabled %}
-                    <button type="submit" class="danger">Disable the account</button>
-                    <p class="help">The user can no longer sign in and the applications can no longer renew his tokens. Can be undone.</p>
+                    <button type="submit" class="danger">{{ 'admin.user.disable_account'|trans }}</button>
+                    <p class="help">{{ 'admin.user.user_can_no_longer_sign'|trans }}</p>
                 {% else %}
-                    <button type="submit">Enable the account</button>
+                    <button type="submit">{{ 'admin.user.enable_account'|trans }}</button>
                 {% endif %}
             </form>
             <form method="post" action="{{ path('app_admin_user_delete', {id: target.id}) }}">
                 <div class="row">
-                    <div class="grow"><label for="confirm-delete">To delete the account for good, type its username ({{ target.username }})</label>
+                    <div class="grow"><label for="confirm-delete">{{ 'admin.user.to_delete_account_for_good'|trans({'{username}': target.username}) }}</label>
                         <input type="text" id="confirm-delete" name="confirm" autocomplete="off" required></div>
-                    <div><button type="submit" class="danger">Delete the account</button></div>
+                    <div><button type="submit" class="danger">{{ 'admin.user.delete_account'|trans }}</button></div>
                 </div>
-                <p class="help">Removes the account, its rights and its impersonation history. Cannot be undone: prefer disabling.</p>
+                <p class="help">{{ 'admin.user.removes_account_rights_and_impersonation'|trans }}</p>
                 <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user') }}">
             </form>
         </section>

@@ -8,6 +8,9 @@ use App\Entity\AccessGrant;
 use App\Entity\AccessProfile;
 use App\Entity\User;
 use App\Event\AccountEvent;
+use App\I18n\InvalidInput;
+use App\I18n\Refusal;
+use App\I18n\Text;
 use Doctrine\ORM\EntityManagerInterface;
 use GuillaumeTissier\ResourceGuard\Access\AccessExpression;
 use GuillaumeTissier\ResourceGuard\Webhook\WebhookEvent;
@@ -100,19 +103,19 @@ final readonly class ProfileManager
         $code = strtolower(trim($code));
         $name = trim($name);
         if ('' === $name) {
-            throw new \InvalidArgumentException('Give the profile a name.');
+            throw new InvalidInput('access.profiles.give_profile_name');
         }
         if ($expression->isEmpty()) {
-            throw new \InvalidArgumentException('Give the profile at least one rule.');
+            throw new InvalidInput('access.profiles.give_profile_at_least_one');
         }
         if (null !== ($error = $this->catalog->unknownTypes($expression))) {
-            throw new \InvalidArgumentException($error);
+            throw new InvalidInput($error->getKey(), $error->getParameters());
         }
 
         $profile = $this->find($code);
         if ($create) {
             if (null !== $profile) {
-                throw new \InvalidArgumentException(\sprintf('The profile "%s" already exists: edit it instead.', $code));
+                throw new InvalidInput('access.profiles.profile_code_already_exists_edit', ['{code}' => $code]);
             }
             $profile = new AccessProfile($code, $name, $expression, $description);
             $this->em->persist($profile);
@@ -122,7 +125,7 @@ final readonly class ProfileManager
         }
 
         if (null === $profile) {
-            throw new \InvalidArgumentException(\sprintf('Unknown profile "%s".', $code));
+            throw new InvalidInput('access.profiles.unknown_profile_code', ['{code}' => $code]);
         }
         $impact = $this->impact($profile, $expression);
         if ($profile->update($name, $expression, $description)) {
@@ -151,8 +154,8 @@ final readonly class ProfileManager
     {
         $grants = $this->grantsOf($profile);
         if ([] !== $grants) {
-            $shown = array_map(static fn (AccessGrant $g): string => \sprintf('%s on %s', $g->getUser()->getUsername(), $g->getDomain()->getPath()), \array_slice($grants, 0, 5));
-            throw new \DomainException(\sprintf('The profile "%s" is still given to %d user(s): %s%s. Change their rights first.', $profile->getCode(), \count($grants), implode('; ', $shown), \count($grants) > \count($shown) ? '…' : ''));
+            $shown = array_map(static fn (AccessGrant $g): Text => new Text('access.profiles.username_on_domain', ['{username}' => $g->getUser()->getUsername(), '{domain}' => $g->getDomain()->getPath()]), \array_slice($grants, 0, 5));
+            throw new Refusal('access.profiles.profile_code_is_still_given', ['{code}' => $profile->getCode(), '{count}' => \count($grants), '{users}' => $shown, '{more}' => \count($grants) > \count($shown) ? '…' : '']);
         }
         $this->em->remove($profile);
         $this->audit('access_profile.removed', $profile, $actor);

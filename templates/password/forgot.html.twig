@@ -1,21 +1,20 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Forgot your password?{% endblock %}
+{% block title %}{{ 'common.forgot_password'|trans }}{% endblock %}
 
 {% block body %}
-    <h1>Forgot your password?</h1>
+    <h1>{{ 'common.forgot_password'|trans }}</h1>
     {% if sent %}
-        <div class="alert ok" role="status">If an account matches, an e-mail with a link to choose a new password is on its way.
-            The link works once, for a limited time.</div>
-        <p class="sub">Nothing after a few minutes? Check your spam folder, or ask an administrator: the account may have no e-mail address.</p>
+        <div class="alert ok" role="status">{{ 'password.forgot.if_account_matches_e_mail'|trans }}</div>
+        <p class="sub">{{ 'password.forgot.nothing_after_few_minutes_check'|trans }}</p>
     {% else %}
-        <p class="sub">Give your username or your e-mail address. We send a link to choose a new password to the e-mail address of the account.</p>
+        <p class="sub">{{ 'password.forgot.give_username_or_e_mail'|trans }}</p>
         <form method="post">
-            <label for="identifier">Username or e-mail address</label>
+            <label for="identifier">{{ 'password.forgot.username_or_e_mail_address'|trans }}</label>
             <input type="text" id="identifier" name="identifier" autocomplete="username" required autofocus>
             <input type="hidden" name="_csrf_token" value="{{ csrf_token('password_forgot') }}">
-            <button type="submit">Send the link</button>
+            <button type="submit">{{ 'password.forgot.send_link'|trans }}</button>
         </form>
     {% endif %}
-    <p class="links"><a href="{{ path('app_login') }}">Back to sign in</a></p>
+    <p class="links"><a href="{{ path('app_login') }}">{{ 'password.forgot.back_to_sign_in'|trans }}</a></p>
 {% endblock %}
